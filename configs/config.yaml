@@ -1,2 +1,8 @@
 bot:
   token: "6263884187:AAFF7sbh49W4uImSgHwS_EMZVv63CQGjutk"
+db-conn:
+  host: "localhost"
+  port: 5432
+  password: "m1pepass"
+  username: "m1pes-user"
+  database: "m1pes"

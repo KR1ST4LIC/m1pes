@@ -12,15 +12,3 @@ func NewUser(userId int64) User {
 func (u User) UpdateBalance(newBalance float64) {
 	u.Balance = newBalance
 }
-
-//func (u User) UpdateCity(newCity string) {
-//	u.City = newCity
-//}
-//
-//func (u User) UpdateSex(newSex string) {
-//	u.Sex = newSex
-//}
-//
-//func (u User) UpdateHeight(newHeight string) {
-//	u.Name = newHeight
-//}

@@ -14,8 +14,8 @@ func New(stockRepo apiStock.Repository, storageRepo storageStock.Repository) *Se
 	return &Service{stockRepo: stockRepo, storageRepo: storageRepo}
 }
 
-func (s *Service) GetCoinList() ([]string, error) {
-	list, err := s.storageRepo.GetCoinList()
+func (s *Service) GetCoinList(userId int64) ([]string, error) {
+	list, err := s.storageRepo.GetCoinList(userId)
 	if err != nil {
 		return nil, err
 	}

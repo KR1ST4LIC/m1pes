@@ -3,10 +3,12 @@ package app
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
-	userHandler "m1pes/internal/delivery/telegram/bot"
+	handler "m1pes/internal/delivery/telegram/bot"
 	"m1pes/internal/repository/api/stocks/bybit"
-	"m1pes/internal/repository/storage/stocks/postgres"
+	stockPostgres "m1pes/internal/repository/storage/stocks/postgres"
+	userPostgres "m1pes/internal/repository/storage/user/postgres"
 	"m1pes/internal/service/stocks"
+	"m1pes/internal/service/user"
 )
 
 type App struct {
@@ -21,14 +23,18 @@ func New() *App {
 }
 
 func (a *App) Start() {
-	storageStock := postgres.New()
+	// stock dependencies
+	storageStock := stockPostgres.New()
 	apiStock := bybit.New()
-
 	stockService := stocks.New(apiStock, storageStock)
 
-	handler := userHandler.New(stockService)
+	// user dependencies
+	storageUser := userPostgres.New()
+	userService := user.New(storageUser)
 
-	if err := a.RunTelegramBot(handler); err != nil {
+	h := handler.New(stockService, userService)
+
+	if err := a.RunTelegramBot(h); err != nil {
 		log.Fatal(err)
 	}
 }

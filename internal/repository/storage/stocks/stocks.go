@@ -1,5 +1,5 @@
 package stocks
 
 type Repository interface {
-	GetCoinList() ([]string, error)
+	GetCoinList(userId int64) ([]string, error)
 }

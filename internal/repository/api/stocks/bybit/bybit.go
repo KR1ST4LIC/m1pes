@@ -48,13 +48,13 @@ func (r *Repository) GetPrice(coinTag string) (float64, error) {
 	var data map[string]interface{}
 
 	if err = json.Unmarshal(body, &data); err != nil {
-		fmt.Println("Ошибка при распаковке JSON:", err)
+		fmt.Println("error in unmarshal:", err)
 		return 0, err
 	}
 
 	result := data["result"].([]interface{})
 	if len(result) == 0 {
-		fmt.Println("Результат пустой")
+		fmt.Println("empty result")
 		return 0, nil
 	}
 

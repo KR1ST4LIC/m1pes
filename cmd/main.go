@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"m1pes/internal/app"
 )
 
@@ -20,8 +21,16 @@ type Coin struct {
 }
 
 func main() {
-	a := app.New()
-	a.Start()
+	//ctx := context.Background()
+
+	a, err := app.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = a.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	//var bal float64
 	//var procent float64

@@ -2,10 +2,11 @@ package app
 
 import (
 	"errors"
-	"github.com/joho/godotenv"
-	"gopkg.in/yaml.v3"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -40,7 +41,7 @@ func (a *App) InitConfig() error {
 }
 
 func getEnv(envKey string) (string, error) {
-	err := godotenv.Load("././.env")
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Printf("err loading: %v\n", err)
 	}

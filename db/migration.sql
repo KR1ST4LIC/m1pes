@@ -5,7 +5,8 @@ CREATE TABLE users
     "bal" double precision,
     "capital" double precision,
     "percent" double precision,
-    "income" double precision
+    "income" double precision,
+    "status" text
 );
 CREATE TABLE coin
 (

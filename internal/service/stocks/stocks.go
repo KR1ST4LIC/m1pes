@@ -21,3 +21,11 @@ func (s *Service) GetCoinList(userId int64) ([]string, error) {
 	}
 	return list, nil
 }
+
+func (s *Service) ExistCoin(coinTag string) (bool, error) {
+	list, err := s.stockRepo.ExistCoin(coinTag)
+	if err != nil {
+		return false, err
+	}
+	return list, nil
+}

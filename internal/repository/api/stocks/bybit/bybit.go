@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -19,7 +20,11 @@ type Repository struct {
 }
 
 func New() *Repository {
-	return &Repository{}
+	return &Repository{
+		cli: &http.Client{
+			Timeout: time.Minute,
+		},
+	}
 }
 
 func (r *Repository) GetPrice(ctx context.Context, coinTag string) (float64, error) {

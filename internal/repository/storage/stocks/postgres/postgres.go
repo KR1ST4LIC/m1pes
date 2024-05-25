@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"github.com/jackc/pgx"
+
 	"m1pes/internal/config"
 )
 
@@ -25,6 +26,23 @@ func New(cfg config.DBConnConfig) *Repository {
 }
 
 func (r *Repository) GetCoinList(userId int64) ([]string, error) {
+	var coinList []string
+	rows, err := r.Conn.Query("SELECT coin_name FROM coin WHERE user_id=$1", userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var coin string
+	for rows.Next() {
+		if err = rows.Scan(&coin); err != nil {
+			return nil, err
+		}
+		coinList = append(coinList, coin)
+	}
+	return coinList, nil
+}
+
+func (r *Repository) AddCoin(userId int64, coinTag string) ([]string, error) {
 	var coinList []string
 	rows, err := r.Conn.Query("SELECT coin_name FROM coin WHERE user_id=$1", userId)
 	if err != nil {

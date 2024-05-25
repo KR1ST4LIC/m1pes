@@ -9,10 +9,12 @@ func (h *Handler) Route(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 			h.Start(b, update)
 		case "coin":
 			h.GetCoinList(b, update)
-		case "/percent":
+		case "percent":
 			h.GetNewPercent(b, update)
-		case "":
-
+		case "addCoin":
+			h.GetNewCoin(b, update)
+		default:
+			h.UnknownCommand(b, update)
 		}
 	}
 }

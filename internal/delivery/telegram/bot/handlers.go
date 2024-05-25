@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"m1pes/internal/logging"
@@ -19,6 +20,7 @@ type (
 
 	UserService interface {
 		NewUser(ctx context.Context, user models.User) error
+		ReplenishBalance(ctx context.Context, userId, amount int64) error
 	}
 )
 
@@ -65,6 +67,16 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	_, err = b.Send(msg)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+	}
+}
+
+func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	fmt.Println("herererere")
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(int64))
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
 	}
 }
 

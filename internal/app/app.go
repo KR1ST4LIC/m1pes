@@ -21,7 +21,6 @@ import (
 type App struct {
 	bot *tgbotapi.BotAPI
 	cfg *config.Config
-	//logger *slog.Logger
 }
 
 func New() (*App, error) {

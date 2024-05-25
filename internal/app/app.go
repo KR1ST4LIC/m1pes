@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"m1pes/internal/config"
 	handler "m1pes/internal/delivery/telegram/bot"
-	"m1pes/internal/logging"
 	"m1pes/internal/repository/api/stocks/bybit"
 	stockPostgres "m1pes/internal/repository/storage/stocks/postgres"
 	userPostgres "m1pes/internal/repository/storage/user/postgres"
+	"m1pes/internal/service/algorithm"
 	"m1pes/internal/service/stocks"
 	"m1pes/internal/service/user"
 	"os"
@@ -42,8 +42,11 @@ func (a *App) Start(ctx context.Context) error {
 	storageUser := userPostgres.New(a.cfg.DBConn)
 	userService := user.New(storageUser)
 
+	//algorithm dependencies
+	algoService := algorithm.New(apiStock, storageStock, storageUser)
+
 	// init handler
-	h := handler.New(stockService, userService)
+	h := handler.New(stockService, userService, algoService)
 
 	go func() {
 		if err := a.RunTelegramBot(ctx, h); err != nil {
@@ -57,15 +60,8 @@ func (a *App) Start(ctx context.Context) error {
 
 	slog.Info("Shutting down app...")
 
-	err := storageUser.Conn.Close()
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "Error: ", err.Error())
-	}
-
-	err = storageStock.Conn.Close()
-	if err != nil {
-		log.Println(err)
-	}
+	storageUser.Conn.Close()
+	storageStock.Conn.Close()
 
 	return nil
 }

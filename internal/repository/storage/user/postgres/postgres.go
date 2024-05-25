@@ -10,16 +10,18 @@ import (
 )
 
 type Repository struct {
-	Conn *pgx.Conn
+	Conn *pgx.ConnPool
 }
 
 func New(cfg config.DBConnConfig) *Repository {
-	conn, err := pgx.Connect(pgx.ConnConfig{
-		Host:     cfg.Host,
-		Port:     uint16(cfg.Port),
-		User:     cfg.Username,
-		Password: cfg.Password,
-		Database: cfg.Database,
+	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+		ConnConfig: pgx.ConnConfig{
+			Host:     cfg.Host,
+			Port:     uint16(cfg.Port),
+			User:     cfg.Username,
+			Password: cfg.Password,
+			Database: cfg.Database,
+		},
 	})
 	if err != nil {
 		panic(err)
@@ -38,9 +40,19 @@ func (r *Repository) IncrementBalance(ctx context.Context, userId, amount int64)
 }
 
 func (r *Repository) NewUser(ctx context.Context, user models.User) error {
-	_, err := r.Conn.ExecEx(ctx, "INSERT INTO users(tg_id, bal) VALUES($1, 0) ON CONFLICT DO NOTHING;", nil, user.Id)
+	_, err := r.Conn.ExecEx(ctx, "INSERT INTO users(tg_id, bal, capital, percent, income) VALUES($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING;", nil, user.Id, user.Balance, user.Capital, user.Percent, user.Income)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
+	var user models.User
+	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, income FROM users WHERE tg_id=$1", nil, userId)
+	err := res.Scan(&user.Balance, &user.Capital, &user.Percent, &user.Income)
+	if err != nil {
+		return models.User{}, err
+	}
+	return user, nil
 }

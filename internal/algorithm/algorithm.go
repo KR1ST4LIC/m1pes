@@ -1,30 +1,31 @@
 package algorithm
 
-func Algorithm(currentPrice, bal float64, count *int64, buy []*float64, entryPrice, decrement, procent *float64) {
-	if currentPrice > *entryPrice {
-		*entryPrice = currentPrice
-		*decrement = *entryPrice * *procent * float64(len(buy)+1)
+import "m1pes/internal/models"
 
+func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) {
+	if currentPrice > coin.EntryPrice {
+		coin.EntryPrice = currentPrice
+		coin.Decrement = coin.EntryPrice * user.Percent * float64(len(coin.Buy)+1)
 	}
-	if *entryPrice-*decrement >= currentPrice {
-		buy = append(buy, &currentPrice) // покупать count * currentPrice
-		if *count == 0 {
-			*count += int64(bal * 0.01 / currentPrice)
+	if coin.EntryPrice-coin.Decrement >= currentPrice {
+		coin.Buy = append(coin.Buy, currentPrice) // покупать count * currentPrice
+		if coin.Count == 0 {
+			coin.Count += int64(user.Balance * 0.01 / currentPrice)
 		} else {
-			*count = *count / int64(len(buy)-1) * int64(len(buy))
+			coin.Count = coin.Count / int64(len(coin.Buy)-1) * int64(len(coin.Buy))
 		}
-		*decrement += *entryPrice * *procent
+		coin.Decrement += coin.EntryPrice * user.Percent
 	}
 	var sum float64
-	for i := 0; i < len(buy); i++ {
-		sum += *buy[i]
+	for i := 0; i < len(coin.Buy); i++ {
+		sum += (coin.Buy)[i]
 	}
-	avg := sum / float64(len(buy))
-	if avg+*procent*avg <= currentPrice {
+	avg := sum / float64(len(coin.Buy))
+	if avg+user.Percent*avg <= currentPrice {
 		//sell
-		clear(buy) // очистить в дб
-		*decrement = *entryPrice * *procent
-		*entryPrice = 0
-		*count = 0
+		clear(coin.Buy) // очистить в дб
+		coin.Decrement = coin.EntryPrice * user.Percent
+		coin.EntryPrice = 0
+		coin.Count = 0
 	}
 }

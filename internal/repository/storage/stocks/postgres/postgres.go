@@ -3,27 +3,40 @@ package postgres
 import (
 	"context"
 	"github.com/jackc/pgx"
+	"m1pes/internal/models"
 
 	"m1pes/internal/config"
 )
 
 type Repository struct {
-	Conn *pgx.Conn
+	Conn *pgx.ConnPool
 }
 
 func New(cfg config.DBConnConfig) *Repository {
-	conn, err := pgx.Connect(pgx.ConnConfig{
-		Host:     cfg.Host,
-		Port:     uint16(cfg.Port),
-		User:     cfg.Username,
-		Password: cfg.Password,
-		Database: cfg.Database,
+	conn, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+		ConnConfig: pgx.ConnConfig{
+			Host:     cfg.Host,
+			Port:     uint16(cfg.Port),
+			User:     cfg.Username,
+			Password: cfg.Password,
+			Database: cfg.Database,
+		},
 	})
 	if err != nil {
 		panic(err)
 	}
 
 	return &Repository{Conn: conn}
+}
+
+func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
+	var coin models.Coin
+	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy FROM coin WHERE user_id=$1 AND coin_name=$2", nil, userId, coinName)
+	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy)
+	if err != nil {
+		return coin, err
+	}
+	return coin, nil
 }
 
 func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]string, error) {
@@ -43,8 +56,15 @@ func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]string, e
 	return coinList, nil
 }
 
-func (r *Repository) AddCoin(userId int64, coinTag string) error {
-	_, err := r.Conn.Exec("INSERT INTO coin (user_id, coin_name) VALUES ($1, $2)", userId, coinTag)
+func (r *Repository) AddCoin(coin models.Coin) error {
+	_, err := r.Conn.Exec("INSERT INTO coin (user_id, coin_name, entry_price, decrement, count, buy) VALUES ($1, $2, $3, $4, $5, $6)",
+		coin.UserId,
+		coin.Name,
+		coin.EntryPrice,
+		coin.Decrement,
+		coin.Count,
+		coin.Buy,
+	)
 	if err != nil {
 		return err
 	}

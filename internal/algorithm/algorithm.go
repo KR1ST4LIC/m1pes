@@ -3,7 +3,6 @@ package algorithm
 func Algorithm(currentPrice, bal float64, count *int64, buy []*float64, entryPrice, decrement, procent *float64) {
 	if currentPrice > *entryPrice {
 		*entryPrice = currentPrice
-
 		*decrement = *entryPrice * *procent * float64(len(buy)+1)
 
 	}

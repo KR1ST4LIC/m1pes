@@ -19,6 +19,8 @@ type (
 	StockService interface {
 		GetCoinList(ctx context.Context, userId int64) ([]string, error)
 		ExistCoin(ctx context.Context, coinTag string) (bool, error)
+		StartTrading(ctx context.Context, userId int64) error
+		StopTradingCoin(ctx context.Context, userId int64, coin string) error
 		AddCoin(userId int64, coinTag string) error
 		CheckStatus(userId int64) (string, error)
 		UpdateStatus(userID int64, status string) error
@@ -54,6 +56,24 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 	_, err = b.Send(msg)
 	if err != nil {
 		log.Println(err)
+	}
+}
+
+func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	err := h.ss.StartTrading(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
+	}
+}
+
+func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	err := h.ss.StopTradingCoin(ctx, update.Message.From.ID, ctx.Value("coin").(string))
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
 	}
 }
 

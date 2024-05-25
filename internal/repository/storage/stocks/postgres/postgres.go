@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"github.com/jackc/pgx"
 
 	"m1pes/internal/config"
@@ -25,9 +26,9 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
-func (r *Repository) GetCoinList(userId int64) ([]string, error) {
+func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]string, error) {
 	var coinList []string
-	rows, err := r.Conn.Query("SELECT coin_name FROM coin WHERE user_id=$1", userId)
+	rows, err := r.Conn.QueryEx(ctx, "SELECT coin_name FROM coin WHERE user_id=$1", nil, userId)
 	if err != nil {
 		return nil, err
 	}

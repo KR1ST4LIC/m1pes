@@ -2,10 +2,10 @@ package algorithm
 
 import "m1pes/internal/models"
 
-func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) {
-	if currentPrice > coin.EntryPrice {
+func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) bool {
+	if currentPrice > coin.EntryPrice && coin.Count == 0 {
 		coin.EntryPrice = currentPrice
-		coin.Decrement = coin.EntryPrice * user.Percent * float64(len(coin.Buy)+1)
+		return true
 	}
 	if coin.EntryPrice-coin.Decrement >= currentPrice {
 		coin.Buy = append(coin.Buy, currentPrice) // покупать count * currentPrice
@@ -28,4 +28,5 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) {
 		coin.EntryPrice = 0
 		coin.Count = 0
 	}
+	return false
 }

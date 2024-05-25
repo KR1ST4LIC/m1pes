@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/jackc/pgx"
+
 	"m1pes/internal/models"
 
 	"m1pes/internal/config"
@@ -100,6 +102,15 @@ func (r *Repository) UpdateStatus(userID int64, status string) error {
 
 func (r *Repository) UpdatePercent(userID int64, percent float64) error {
 	_, err := r.Conn.Exec("UPDATE users SET percent = $1 WHERE tg_id=$2", percent, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice float64) error {
+	_, err := r.Conn.Exec("UPDATE coin SET entry_price = $1 WHERE (tg_id,coin_name)=($2,$3)", entryPrice, userID, coinTag)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
 	"m1pes/internal/algorithm"
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"
@@ -57,16 +58,13 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 						return
 					}
 
-					algorithm.Algorithm(currentPrice, &coin, &user)
+					change := algorithm.Algorithm(currentPrice, &coin, &user)
 
 					fmt.Println(coin.Name, currentPrice, coin.Count)
 
-					err = s.uStoRepo.NewUser(ctx, user)
-					if err != nil {
-						slog.ErrorContext(ctx, "Error creating new user", err)
-						return
+					if change {
+						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice)
 					}
-
 					err = s.sStoRepo.AddCoin(coin)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error adding coin", err)

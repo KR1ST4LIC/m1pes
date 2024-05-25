@@ -1,18 +1,19 @@
 package bot
 
-import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+import (
+	"context"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
 
-func (h *Handler) Route(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	if update.Message != nil {
 		switch update.Message.Command() {
 		case "start":
-			h.Start(b, update)
+			h.Start(ctx, b, update)
 		case "coin":
-			h.GetCoinList(b, update)
+			h.GetCoinList(ctx, b, update)
 		case "/percent":
-			h.GetNewPercent(b, update)
-		case "":
-
+			h.GetNewPercent(ctx, b, update)
 		}
 	}
 }

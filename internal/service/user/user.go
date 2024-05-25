@@ -1,6 +1,8 @@
 package user
 
 import (
+	"context"
+	"m1pes/internal/logging"
 	"m1pes/internal/models"
 	"m1pes/internal/repository/storage/user"
 )
@@ -13,10 +15,10 @@ func New(userRepo user.Repository) *Service {
 	return &Service{userRepo: userRepo}
 }
 
-func (s *Service) NewUser(user models.User) error {
-	err := s.userRepo.NewUser(user)
+func (s *Service) NewUser(ctx context.Context, user models.User) error {
+	err := s.userRepo.NewUser(ctx, user)
 	if err != nil {
-		return err
+		return logging.WrapError(ctx, err)
 	}
 	return nil
 }

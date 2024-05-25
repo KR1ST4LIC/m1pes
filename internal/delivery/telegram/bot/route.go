@@ -2,9 +2,10 @@ package bot
 
 import (
 	"context"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"strconv"
 	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
@@ -31,6 +32,10 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			coin := parts[1]
 			ctx = context.WithValue(ctx, "coin", coin)
 			h.StopTrading(ctx, b, update)
+		case "addCoin":
+			h.GetNewCoin(ctx, b, update)
+		default:
+			h.UnknownCommand(ctx, b, update)
 		}
 	}
 }

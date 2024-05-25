@@ -30,3 +30,11 @@ func (s *Service) NewUser(ctx context.Context, user models.User) error {
 	}
 	return nil
 }
+
+func (s *Service) GetUser(ctx context.Context, userId int64) (models.User, error) {
+	u, err := s.userRepo.GetUser(ctx, userId)
+	if err != nil {
+		return models.User{}, logging.WrapError(ctx, err)
+	}
+	return u, nil
+}

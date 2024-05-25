@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"m1pes/internal/logging"
 	"strconv"
 	"strings"
+
+	"m1pes/internal/logging"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -84,7 +85,8 @@ func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, upda
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
 	}
 }
-func (h *Handler) GetNewPercent(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) GetNewPercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 	err := h.ss.UpdateStatus(update.Message.From.ID, "updatePercent")
 	if err != nil {
 		log.Println(err)
@@ -124,7 +126,9 @@ func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	}
 }
 
-func (h *Handler) UnknownCommand(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
 	var status string
 	status, err := h.ss.CheckStatus(update.Message.From.ID)
 	if err != nil {
@@ -160,7 +164,7 @@ func (h *Handler) UnknownCommand(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 			}
 		}
 	case "addCoin":
-		can, err := h.ss.ExistCoin(update.Message.Text)
+		can, err := h.ss.ExistCoin(ctx, update.Message.Text)
 		if err != nil {
 			log.Println(err)
 		}

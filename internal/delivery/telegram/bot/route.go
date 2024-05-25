@@ -2,9 +2,10 @@ package bot
 
 import (
 	"context"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"strconv"
 	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
@@ -22,11 +23,11 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			amount, _ := strconv.ParseInt(parts[1], 10, 64)
 			ctx = context.WithValue(ctx, "replenishAmount", amount)
 			h.ReplenishBalance(ctx, b, update)
-			h.GetCoinList(b, update)
+			h.GetCoinList(ctx, b, update)
 		case "addCoin":
-			h.GetNewCoin(b, update)
+			h.GetNewCoin(ctx, b, update)
 		default:
-			h.UnknownCommand(b, update)
+			h.UnknownCommand(ctx, b, update)
 		}
 	}
 }

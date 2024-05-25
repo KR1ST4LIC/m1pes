@@ -1,6 +1,7 @@
 package bybit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 
 const (
 	priceURL = "https://api.bybit.com/v2/public/tickers?symbol="
+	apiKey   = "e6jg0dLQEagHAiBvk6"
 )
 
 type Repository struct {
@@ -20,9 +22,7 @@ func New() *Repository {
 	return &Repository{}
 }
 
-func (r *Repository) GetPrice(coinTag string) (float64, error) {
-	apiKey := "e6jg0dLQEagHAiBvk6"
-
+func (r *Repository) GetPrice(ctx context.Context, coinTag string) (float64, error) {
 	url := priceURL + coinTag
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -63,9 +63,7 @@ func (r *Repository) GetPrice(coinTag string) (float64, error) {
 	return price, nil
 }
 
-func (r *Repository) ExistCoin(coinTag string) (bool, error) {
-	apiKey := "e6jg0dLQEagHAiBvk6"
-
+func (r *Repository) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
 	url := priceURL + coinTag
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -91,13 +89,13 @@ func (r *Repository) ExistCoin(coinTag string) (bool, error) {
 	var data map[string]interface{}
 
 	if err = json.Unmarshal(body, &data); err != nil {
-		fmt.Println("Ошибка при распаковке JSON:", err)
+		fmt.Println("error in unmarshal:", err)
 		return false, err
 	}
 
 	result := data["result"].([]interface{})
 	if len(result) == 0 {
-		fmt.Println("Результат пустой")
+		fmt.Println("empty result")
 		return false, nil
 	}
 

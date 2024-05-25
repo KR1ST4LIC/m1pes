@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"context"
+	"fmt"
 	"github.com/jackc/pgx"
 	"m1pes/internal/config"
 	"m1pes/internal/models"
@@ -25,8 +27,17 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
-func (r *Repository) NewUser(user models.User) error {
-	_, err := r.Conn.Exec("INSERT INTO users(tg_id) VALUES($1) ON CONFLICT DO NOTHING;", user.Id)
+func (r *Repository) IncrementBalance(ctx context.Context, userId, amount int64) error {
+	cmd, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
+	if err != nil {
+		return err
+	}
+	fmt.Println(cmd.RowsAffected())
+	return nil
+}
+
+func (r *Repository) NewUser(ctx context.Context, user models.User) error {
+	_, err := r.Conn.ExecEx(ctx, "INSERT INTO users(tg_id, bal) VALUES($1, 0) ON CONFLICT DO NOTHING;", nil, user.Id)
 	if err != nil {
 		return err
 	}

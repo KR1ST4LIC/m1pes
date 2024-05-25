@@ -1,7 +1,11 @@
 package bot
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"log/slog"
+	"m1pes/internal/logging"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -10,12 +14,13 @@ import (
 
 type (
 	StockService interface {
-		GetCoinList(userId int64) ([]string, error)
-		ExistCoin(coinTag string) (bool, error)
+		GetCoinList(ctx context.Context, userId int64) ([]string, error)
+		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 	}
 
 	UserService interface {
-		NewUser(user models.User) error
+		NewUser(ctx context.Context, user models.User) error
+		ReplenishBalance(ctx context.Context, userId, amount int64) error
 	}
 )
 
@@ -28,11 +33,14 @@ func New(ss StockService, us UserService) *Handler {
 	return &Handler{ss: ss, us: us}
 }
 
-func (h *Handler) Start(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+	slog.InfoContext(ctx, "new call of start handler!")
+
 	user := models.NewUser(update.Message.From.ID)
-	err := h.us.NewUser(user)
+	err := h.us.NewUser(ctx, user)
 	if err != nil {
-		log.Println(err)
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in NewUser", err)
 	}
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "hi there!")
@@ -42,10 +50,12 @@ func (h *Handler) Start(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	}
 }
 
-func (h *Handler) GetCoinList(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	list, err := h.ss.GetCoinList(update.Message.Chat.ID)
+func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	list, err := h.ss.GetCoinList(ctx, update.Message.Chat.ID)
 	if err != nil {
-		log.Println(err)
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
 	var text string
 	text = "Ваши монеты: "
@@ -56,27 +66,41 @@ func (h *Handler) GetCoinList(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	_, err = b.Send(msg)
 	if err != nil {
-		log.Println(err)
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 	}
 }
 
-func (h *Handler) GetNewPercent(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	fmt.Println("herererere")
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(int64))
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
+	}
+}
+
+func (h *Handler) GetNewPercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "На скольки процентах вы хотите торговать?")
 	_, err := b.Send(msg)
 	if err != nil {
-		log.Println(err)
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 	}
 	// записать в дб статус /create percent
 }
 
-func (h *Handler) GetNewCoin(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	list, err := h.ss.GetCoinList(update.Message.Chat.ID)
+func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	list, err := h.ss.GetCoinList(ctx, update.Message.Chat.ID)
 	if err != nil {
 		log.Println(err)
 	}
 	if len(list) < 5 {
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Скиньте тег койна, например: BTCUSDT или ETHUSDT")
-		_, err := b.Send(msg)
+		_, err = b.Send(msg)
 		if err != nil {
 			log.Println(err)
 		}
@@ -84,7 +108,7 @@ func (h *Handler) GetNewCoin(b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	} else {
 		//h.ss.ExistCoin(coinTag) check est li moneta
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "У вас уже 5 монет, если хотите добавить новую - удалить старую /delete")
-		_, err := b.Send(msg)
+		_, err = b.Send(msg)
 		if err != nil {
 			log.Println(err)
 		}

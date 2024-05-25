@@ -19,9 +19,18 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 		case "percent":
 			h.GetNewPercent(ctx, b, update)
 		case "replenish":
+			if len(parts) != 2 {
+				return
+			}
 			amount, _ := strconv.ParseInt(parts[1], 10, 64)
 			ctx = context.WithValue(ctx, "replenishAmount", amount)
 			h.ReplenishBalance(ctx, b, update)
+		case "starttrading":
+			h.StartTrading(ctx, b, update)
+		case "stoptrading":
+			coin := parts[1]
+			ctx = context.WithValue(ctx, "coin", coin)
+			h.StopTrading(ctx, b, update)
 		}
 	}
 }

@@ -59,7 +59,7 @@ func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]string, e
 }
 
 func (r *Repository) AddCoin(coin models.Coin) error {
-	_, err := r.Conn.Exec("INSERT INTO coin (user_id, coin_name, entry_price, decrement, count, buy) VALUES ($1, $2, $3, $4, $5, $6)",
+	_, err := r.Conn.Exec("INSERT INTO coin (user_id, coin_name, entry_price, decrement, count, buy) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING;",
 		coin.UserId,
 		coin.Name,
 		coin.EntryPrice,

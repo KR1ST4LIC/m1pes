@@ -23,6 +23,7 @@ type Coin struct {
 }
 
 func main() {
+
 	ctx := context.Background()
 
 	a, err := app.New()

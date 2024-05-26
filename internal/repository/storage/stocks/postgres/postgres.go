@@ -110,7 +110,7 @@ func (r *Repository) UpdatePercent(userID int64, percent float64) error {
 }
 
 func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice float64) error {
-	_, err := r.Conn.Exec("UPDATE coin SET entry_price = $1 WHERE (tg_id,coin_name)=($2,$3)", entryPrice, userID, coinTag)
+	_, err := r.Conn.Exec("UPDATE coin SET entry_price = $1 WHERE (user_id,coin_name)=($2,$3)", entryPrice, userID, coinTag)
 	if err != nil {
 		return err
 	}

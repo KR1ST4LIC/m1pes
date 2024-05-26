@@ -1,11 +1,20 @@
 package algorithm
 
-import "m1pes/internal/models"
+import (
+	"m1pes/internal/models"
+)
 
-func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) bool {
+const (
+	ChangeAction = "change"
+	SellAction   = "sell"
+	BuyAction    = "buy"
+	WaitAction   = "wait"
+)
+
+func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) string {
 	if currentPrice > coin.EntryPrice && coin.Count == 0 {
 		coin.EntryPrice = currentPrice
-		return true
+		return ChangeAction
 	}
 	if coin.EntryPrice-coin.Decrement >= currentPrice {
 		coin.Buy = append(coin.Buy, currentPrice) // покупать count * currentPrice
@@ -15,6 +24,7 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) bool 
 			coin.Count = coin.Count / int64(len(coin.Buy)-1) * int64(len(coin.Buy))
 		}
 		coin.Decrement += coin.EntryPrice * user.Percent
+		return BuyAction
 	}
 	var sum float64
 	for i := 0; i < len(coin.Buy); i++ {
@@ -23,10 +33,10 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) bool 
 	avg := sum / float64(len(coin.Buy))
 	if avg+user.Percent*avg <= currentPrice {
 		//sell
-		clear(coin.Buy) // очистить в дб
 		coin.Decrement = coin.EntryPrice * user.Percent
 		coin.EntryPrice = 0
 		coin.Count = 0
+		return SellAction
 	}
-	return false
+	return WaitAction
 }

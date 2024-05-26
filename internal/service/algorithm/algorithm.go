@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"m1pes/internal/algorithm"
@@ -30,12 +31,16 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 	for _, coin := range coinList {
 		// init map that stores coin name as key and map2 as value
 		// map2 stores userId as key and struct{} as value
+		if _, ok := s.stopCoinMap[coin][userId]; ok {
+			continue
+		}
 		s.stopCoinMap[coin] = make(map[int64]chan struct{})
 		s.stopCoinMap[coin][userId] = make(chan struct{})
 		go func(funcCoin string) {
 			for {
 				select {
 				case <-s.stopCoinMap[funcCoin][userId]:
+					delete(s.stopCoinMap[funcCoin], userId)
 					return
 				default:
 					// here is code for algorithm
@@ -72,9 +77,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 						slog.ErrorContext(ctx, "Error adding coin", err)
 						return
 					}
-
-					//time.Sleep(time.Millisecond * 500)
-					//fmt.Println(funcCoin)
 				}
 			}
 		}(coin)
@@ -83,6 +85,9 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 }
 
 func (s *Service) StopTradingCoin(ctx context.Context, userId int64, coin string) error {
+	if _, ok := s.stopCoinMap[coin][userId]; !ok {
+		return errors.New("coin not exist")
+	}
 	s.stopCoinMap[coin][userId] <- struct{}{}
 	return nil
 }

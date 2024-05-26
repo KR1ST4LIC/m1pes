@@ -45,7 +45,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 					delete(s.stopCoinMap[funcCoin], userId)
 					return
 				default:
-					// here is code for algorithm
 					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting price from algorithm", err)
@@ -66,7 +65,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 
 					status := algorithm.Algorithm(currentPrice, &coin, &user)
 
-					fmt.Println(coin.Name, currentPrice, coin.Count)
+					fmt.Println(coin.Name, coin.EntryPrice, coin.Count)
 
 					msg := models.Message{
 						User: user,
@@ -75,7 +74,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 
 					switch status {
 					case algorithm.ChangeAction:
-						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice)
+						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice, user.Percent)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update coin", err)
 							return

@@ -4,7 +4,7 @@ CREATE TABLE users
     "tg_id" bigint primary key,
     "bal" double precision default 0,
     "capital" double precision default 0,
-    "percent" double precision default 1,
+    "percent" double precision ,
     "income" double precision default 0,
     "status" text default 'none'
 );
@@ -15,5 +15,6 @@ CREATE TABLE coin
     "entry_price" double precision default 0,
     "decrement" double precision default 0,
     "count" bigint default 0,
-    "buy" double precision[]
+    "buy" double precision[],
+    unique (coin_name,user_id)
 );

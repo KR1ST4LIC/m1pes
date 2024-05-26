@@ -2,7 +2,6 @@ package logging
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 )
 
@@ -61,9 +60,8 @@ func WrapError(ctx context.Context, err error) error {
 }
 
 func ErrorCtx(ctx context.Context, err error) context.Context {
-	var errCtx *ErrorWithCtx
-	if errors.As(err, &errCtx) {
-		return context.WithValue(ctx, LogCtx{}, errCtx.ctx)
+	if e, ok := err.(*ErrorWithCtx); ok {
+		return context.WithValue(ctx, LogCtx{}, e.ctx)
 	}
 	return ctx
 }

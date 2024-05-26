@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"m1pes/internal/models"
 
 	"m1pes/internal/algorithm"
 	apiStock "m1pes/internal/repository/api/stocks"
@@ -23,7 +24,7 @@ func New(apiRepo apiStock.Repository, sStoRepo storageStock.Repository, uStoRepo
 	return &Service{apiRepo, sStoRepo, uStoRepo, make(map[string]map[int64]chan struct{})}
 }
 
-func (s *Service) StartTrading(ctx context.Context, userId int64) error {
+func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan chan models.Message) error {
 	coinList, err := s.sStoRepo.GetCoinList(ctx, userId)
 	if err != nil {
 		return err
@@ -63,16 +64,30 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 						return
 					}
 
-					change := algorithm.Algorithm(currentPrice, &coin, &user)
+					status := algorithm.Algorithm(currentPrice, &coin, &user)
 
 					fmt.Println(coin.Name, currentPrice, coin.Count)
 
-					if change {
+					msg := models.Message{
+						User: user,
+						Coin: coin,
+					}
+
+					switch status {
+					case algorithm.ChangeAction:
 						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update coin", err)
 							return
 						}
+					case algorithm.WaitAction:
+						continue
+					case algorithm.BuyAction:
+						msg.Action = algorithm.BuyAction
+						actionChan <- msg
+					case algorithm.SellAction:
+						msg.Action = algorithm.SellAction
+						actionChan <- msg
 					}
 				}
 			}

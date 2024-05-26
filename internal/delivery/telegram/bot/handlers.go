@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"m1pes/internal/algorithm"
 	"strconv"
 	"strings"
 
@@ -33,7 +34,7 @@ type (
 	}
 
 	AlgorithmService interface {
-		StartTrading(ctx context.Context, userId int64) error
+		StartTrading(ctx context.Context, userId int64, actionChan chan models.Message) error
 		StopTradingCoin(ctx context.Context, userId int64, coin string) error
 	}
 )
@@ -74,7 +75,29 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 	}
 	user.UpdateUserId(update.Message.From.ID)
 
-	err = h.as.StartTrading(ctx, update.Message.From.ID)
+	actionChan := make(chan models.Message)
+
+	go func() {
+		msg := <-actionChan
+
+		def := fmt.Sprintf("Монета: %s\nПо цене: %f\nКол-во: %d", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count)
+
+		var text string
+		switch msg.Action {
+		case algorithm.SellAction:
+			text = "ПРОДАЖА\n" + def
+		case algorithm.BuyAction:
+			text = "ПОКУПКА\n" + def
+		}
+
+		botMsg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+		_, err = b.Send(botMsg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+	}()
+
+	err = h.as.StartTrading(ctx, update.Message.From.ID, actionChan)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
 	}

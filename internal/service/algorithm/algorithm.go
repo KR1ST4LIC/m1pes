@@ -64,11 +64,10 @@ func (s *Service) StartTrading(ctx context.Context, userId int64) error {
 
 					if change {
 						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice)
-					}
-					err = s.sStoRepo.AddCoin(coin)
-					if err != nil {
-						slog.ErrorContext(ctx, "Error adding coin", err)
-						return
+						if err != nil {
+							slog.ErrorContext(ctx, "Error update coin", err)
+							return
+						}
 					}
 
 					//time.Sleep(time.Millisecond * 500)

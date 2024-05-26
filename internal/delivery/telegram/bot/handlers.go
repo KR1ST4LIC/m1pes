@@ -2,11 +2,13 @@ package bot
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
-	"m1pes/internal/algorithm"
 	"strconv"
 	"strings"
+
+	"m1pes/internal/algorithm"
 
 	"m1pes/internal/logging"
 

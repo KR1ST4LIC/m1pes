@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+
 	"m1pes/internal/models"
 
 	"m1pes/internal/algorithm"
@@ -46,6 +47,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 					return
 				default:
 					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
+					fmt.Scan(&currentPrice)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting price from algorithm", err)
 						return
@@ -82,9 +84,21 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 					case algorithm.WaitAction:
 						continue
 					case algorithm.BuyAction:
+						err = s.sStoRepo.UpdateCount(userId, coin.Count, coin.Name, coin.Decrement, coin.Buy)
+						if err != nil {
+							slog.ErrorContext(ctx, "Error update count", err)
+							return
+						}
 						msg.Action = algorithm.BuyAction
 						actionChan <- msg
 					case algorithm.SellAction:
+						coin.Decrement = currentPrice * user.Percent
+						err = s.sStoRepo.SellAction(userId, coin.Name, currentPrice, coin.Decrement)
+						if err != nil {
+							slog.ErrorContext(ctx, "Error update SellAction", err)
+							return
+						}
+
 						msg.Action = algorithm.SellAction
 						actionChan <- msg
 					}

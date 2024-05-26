@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	if update.Message != nil {
+	if update.Message != nil && update.Message.Chat.IsPrivate() {
 		parts := strings.Split(update.Message.Command(), "_")
 
 		switch parts[0] {

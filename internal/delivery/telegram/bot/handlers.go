@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"strconv"
@@ -58,7 +57,7 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in NewUser", err)
 	}
 
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "hi there!")
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Привет, это бот для торговли на биржах!")
 	_, err = b.Send(msg)
 	if err != nil {
 		log.Println(err)
@@ -78,6 +77,11 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
 	}
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты начал торговлю, бот пришлет сообщение если купит или продаст монеты!")
+	_, err = b.Send(msg)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
@@ -86,6 +90,17 @@ func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	err := h.as.StopTradingCoin(ctx, update.Message.From.ID, ctx.Value("coin").(string))
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты не торгуешь на этой монете, чтобы посмотреть список монет - /coin")
+		_, err = b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты остановил торговлю на этой монете")
+		_, err = b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -108,15 +123,21 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 	}
 }
+
 func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	fmt.Println("herererere")
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
 	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(int64))
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
 	}
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "баланс успешно добавлен")
+	_, err = b.Send(msg)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+	}
 }
+
 func (h *Handler) GetNewPercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 	err := h.ss.UpdateStatus(update.Message.From.ID, "updatePercent")
@@ -148,13 +169,11 @@ func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 			log.Println(err)
 		}
 	} else {
-		//h.ss.ExistCoin(coinTag) check est li moneta
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "У вас уже 5 монет, если хотите добавить новую - удалить старую /delete")
 		_, err = b.Send(msg)
 		if err != nil {
 			log.Println(err)
 		}
-
 	}
 }
 
@@ -174,6 +193,7 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 			log.Println(err)
 		}
 		if percent >= 0.25 && percent <= 20 {
+			percent = percent * 0.01
 			err = h.ss.UpdatePercent(update.Message.From.ID, percent)
 			if err != nil {
 				log.Println(err)
@@ -202,6 +222,7 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 		}
 		if can {
 			coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}
+
 			err = h.ss.AddCoin(coin)
 			if err != nil {
 				log.Println(err)

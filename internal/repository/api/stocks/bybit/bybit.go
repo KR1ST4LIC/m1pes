@@ -22,7 +22,7 @@ type Repository struct {
 func New() *Repository {
 	return &Repository{
 		cli: &http.Client{
-			Timeout: time.Minute,
+			Timeout: 5 * time.Minute,
 		},
 	}
 }

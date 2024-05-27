@@ -53,7 +53,6 @@ func New(ss StockService, us UserService, as AlgorithmService) *Handler {
 
 func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
-	slog.InfoContext(ctx, "new call of start handler!")
 
 	user := models.NewUser(update.Message.From.ID)
 	err := h.us.NewUser(ctx, user)
@@ -86,13 +85,14 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		for {
 			select {
 			case msg := <-h.actionChanMap[update.Message.From.ID]:
-				def := fmt.Sprintf("Монета: %s\nПо цене: %f\nКол-во: %d", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count)
 
 				var text string
 				switch msg.Action {
 				case algorithm.SellAction:
+					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count)
 					text = "ПРОДАЖА\n" + def
 				case algorithm.BuyAction:
+					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
 					text = "ПОКУПКА\n" + def
 				}
 

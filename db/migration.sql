@@ -14,7 +14,7 @@ CREATE TABLE coin
     "coin_name" text,
     "entry_price" double precision default 0,
     "decrement" double precision default 0,
-    "count" bigint default 0,
+    "count" double precision default 0,
     "buy" double precision[],
     unique (coin_name,user_id)
 );

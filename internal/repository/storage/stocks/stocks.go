@@ -14,6 +14,6 @@ type Repository interface {
 	UpdateStatus(userID int64, status string) error
 	UpdatePercent(userID int64, percent float64) error
 	UpdateCoin(userID int64, coinTag string, entryPrice, percent float64) error
-	UpdateCount(userID, count int64, coinTag string, decrement float64, buy []float64) error
+	UpdateCount(userID int64, count float64, coinTag string, decrement float64, buy []float64) error
 	SellAction(userID int64, coinTag string, currentPrice, decrement float64) error
 }

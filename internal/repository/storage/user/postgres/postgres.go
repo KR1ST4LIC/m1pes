@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx"
 
@@ -32,11 +31,10 @@ func New(cfg config.DBConnConfig) *Repository {
 }
 
 func (r *Repository) ChangeBalance(ctx context.Context, userId, amount int64) error {
-	cmd, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
+	_, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
 	if err != nil {
 		return err
 	}
-	fmt.Println(cmd.RowsAffected())
 	return nil
 }
 

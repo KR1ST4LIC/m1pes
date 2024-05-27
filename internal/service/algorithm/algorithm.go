@@ -99,6 +99,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							return
 						}
 
+						coin.Count = 0
+						msg.Coin.CurrentPrice = currentPrice
 						msg.Action = algorithm.SellAction
 						actionChanMap[userId] <- msg
 					}

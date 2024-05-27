@@ -109,7 +109,7 @@ func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice, percen
 	return nil
 }
 
-func (r *Repository) UpdateCount(userID, count int64, coinTag string, decrement float64, buy []float64) error {
+func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, decrement float64, buy []float64) error {
 	_, err := r.Conn.Exec("UPDATE coin SET (decrement, count,buy) = ($1,$2,$3) WHERE (user_id,coin_name)=($4,$5)", decrement, count, buy, userID, coinTag)
 	if err != nil {
 		return err

@@ -2,10 +2,10 @@ package models
 
 type User struct {
 	Id      int64
-	Balance float64 `db:"bal"`
-	Capital float64 `db:"capital"`
-	Percent float64 `db:"percent"`
-	Income  float64 `db:"income"`
+	Balance float64
+	Capital float64
+	Percent float64
+	Income  float64
 }
 
 func NewUser(userId int64) User {

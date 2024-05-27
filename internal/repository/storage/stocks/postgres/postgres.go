@@ -27,7 +27,6 @@ func New(cfg config.DBConnConfig) *Repository {
 	if err != nil {
 		panic(err)
 	}
-
 	return &Repository{Conn: conn}
 }
 
@@ -67,7 +66,6 @@ func (r *Repository) AddCoin(coin models.Coin) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -84,7 +82,6 @@ func (r *Repository) CheckStatus(userId int64) (string, error) {
 		}
 		status = st
 	}
-
 	return status, nil
 }
 
@@ -93,7 +90,6 @@ func (r *Repository) UpdateStatus(userID int64, status string) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -102,7 +98,6 @@ func (r *Repository) UpdatePercent(userID int64, percent float64) error {
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -111,6 +106,5 @@ func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice, percen
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

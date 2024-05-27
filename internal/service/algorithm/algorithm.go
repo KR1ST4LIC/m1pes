@@ -24,7 +24,7 @@ func New(apiRepo apiStock.Repository, sStoRepo storageStock.Repository, uStoRepo
 	return &Service{apiRepo, sStoRepo, uStoRepo, make(map[string]map[int64]chan struct{})}
 }
 
-func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan chan models.Message) error {
+func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap map[int64]chan models.Message) error {
 	coinList, err := s.sStoRepo.GetCoinList(ctx, userId)
 	if err != nil {
 		return err
@@ -83,10 +83,10 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 						continue
 					case algorithm.BuyAction:
 						msg.Action = algorithm.BuyAction
-						actionChan <- msg
+						actionChanMap[userId] <- msg
 					case algorithm.SellAction:
 						msg.Action = algorithm.SellAction
-						actionChan <- msg
+						actionChanMap[userId] <- msg
 					}
 				}
 			}
@@ -97,7 +97,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChan cha
 
 func (s *Service) StopTradingCoin(ctx context.Context, userId int64, coin string) error {
 	if _, ok := s.stopCoinMap[coin][userId]; !ok {
-		return errors.New("coin not exist")
+		return errors.New("coin does not exist")
 	}
 	s.stopCoinMap[coin][userId] <- struct{}{}
 	return nil

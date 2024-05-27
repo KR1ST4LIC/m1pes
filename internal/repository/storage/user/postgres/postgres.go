@@ -31,7 +31,7 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
-func (r *Repository) IncrementBalance(ctx context.Context, userId, amount int64) error {
+func (r *Repository) ChangeBalance(ctx context.Context, userId, amount int64) error {
 	cmd, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
 	if err != nil {
 		return err

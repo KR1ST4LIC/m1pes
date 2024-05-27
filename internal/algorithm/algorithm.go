@@ -28,7 +28,7 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) strin
 	}
 	var sum float64
 	for i := 0; i < len(coin.Buy); i++ {
-		sum += (coin.Buy)[i]
+		sum += coin.Buy[i]
 	}
 	avg := sum / float64(len(coin.Buy))
 	if avg+user.Percent*avg <= currentPrice {

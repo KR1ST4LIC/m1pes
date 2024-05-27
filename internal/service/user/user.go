@@ -16,7 +16,7 @@ func New(userRepo user.Repository) *Service {
 }
 
 func (s *Service) ReplenishBalance(ctx context.Context, userId, amount int64) error {
-	err := s.userRepo.IncrementBalance(ctx, userId, amount)
+	err := s.userRepo.ChangeBalance(ctx, userId, amount)
 	if err != nil {
 		return err
 	}

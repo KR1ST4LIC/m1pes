@@ -35,19 +35,20 @@ type (
 	}
 
 	AlgorithmService interface {
-		StartTrading(ctx context.Context, userId int64, actionChan chan models.Message) error
+		StartTrading(ctx context.Context, userId int64, actionChanMap map[int64]chan models.Message) error
 		StopTradingCoin(ctx context.Context, userId int64, coin string) error
 	}
 )
 
 type Handler struct {
-	as AlgorithmService
-	ss StockService
-	us UserService
+	as            AlgorithmService
+	ss            StockService
+	us            UserService
+	actionChanMap map[int64]chan models.Message
 }
 
 func New(ss StockService, us UserService, as AlgorithmService) *Handler {
-	return &Handler{ss: ss, us: us, as: as}
+	return &Handler{ss: ss, us: us, as: as, actionChanMap: make(map[int64]chan models.Message)}
 }
 
 func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
@@ -68,7 +69,7 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 }
 
 func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+	ctx = logging.WithUserId(ctx, update.Message.From.ID)
 
 	user, err := h.us.GetUser(ctx, update.Message.From.ID)
 	if err != nil {
@@ -76,29 +77,35 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 	}
 	user.UpdateUserId(update.Message.From.ID)
 
-	actionChan := make(chan models.Message)
+	if _, ok := h.actionChanMap[update.Message.Chat.ID]; !ok {
+		h.actionChanMap[update.Message.Chat.ID] = make(chan models.Message)
+	}
 
+	// this goroutine waits for action from algorithm
 	go func() {
-		msg := <-actionChan
+		for {
+			select {
+			case msg := <-h.actionChanMap[update.Message.From.ID]:
+				def := fmt.Sprintf("Монета: %s\nПо цене: %f\nКол-во: %d", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count)
 
-		def := fmt.Sprintf("Монета: %s\nПо цене: %f\nКол-во: %d", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count)
+				var text string
+				switch msg.Action {
+				case algorithm.SellAction:
+					text = "ПРОДАЖА\n" + def
+				case algorithm.BuyAction:
+					text = "ПОКУПКА\n" + def
+				}
 
-		var text string
-		switch msg.Action {
-		case algorithm.SellAction:
-			text = "ПРОДАЖА\n" + def
-		case algorithm.BuyAction:
-			text = "ПОКУПКА\n" + def
-		}
-
-		botMsg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-		_, err = b.Send(botMsg)
-		if err != nil {
-			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+				botMsg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+				_, err = b.Send(botMsg)
+				if err != nil {
+					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+				}
+			}
 		}
 	}()
 
-	err = h.as.StartTrading(ctx, update.Message.From.ID, actionChan)
+	err = h.as.StartTrading(ctx, update.Message.From.ID, h.actionChanMap)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
 	}

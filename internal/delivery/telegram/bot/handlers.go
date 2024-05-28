@@ -99,8 +99,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
 					text = "ПОКУПКА\n" + def
 				}
-
-				botMsg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
+				botMsg := tgbotapi.NewMessage(msg.User.Id, text)
 				_, err = b.Send(botMsg)
 				if err != nil {
 					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)

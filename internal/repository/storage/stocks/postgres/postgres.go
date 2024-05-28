@@ -92,12 +92,12 @@ func (r *Repository) AddCoin(coin models.Coin) error {
 	return nil
 }
 
-func generateUpdateCoinQuery(coin models.Coin) (string, error) {
+func generateUpdateCoinQuery(coin models.Coin) (string, []interface{}, error) {
 	if coin.UserId == 0 {
-		return "", fmt.Errorf("user ID is required")
+		return "", nil, fmt.Errorf("user ID is required")
 	}
 	if coin.Name == "" {
-		return "", fmt.Errorf("name is required")
+		return "", nil, fmt.Errorf("name is required")
 	}
 
 	tableName := "coin"
@@ -127,18 +127,22 @@ func generateUpdateCoinQuery(coin models.Coin) (string, error) {
 	}
 
 	if len(setClauses) == 0 {
-		return "", fmt.Errorf("no fields to update")
+		return "", nil, fmt.Errorf("no fields to update")
 	}
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = $%d AND coin_name=$%d", tableName, strings.Join(setClauses, ", "), i, i+1)
 	values = append(values, coin.UserId, coin.Name)
 
-	return query, nil
+	return query, values, nil
 }
 
-func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice, percent float64) error {
+func (r *Repository) UpdateCoin(ctx context.Context, coin models.Coin) error {
+	query, values, err := generateUpdateCoinQuery(coin)
+	if err != nil {
+		return err
+	}
 
-	_, err := r.Conn.Exec("UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3)", entryPrice, userID, coinTag, percent*entryPrice)
+	_, err = r.Conn.ExecEx(ctx, query, nil, values...)
 	if err != nil {
 		return err
 	}
@@ -151,6 +155,14 @@ func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, de
 		return err
 	}
 
+	return nil
+}
+
+func (r *Repository) ResetCoin(ctx context.Context, coin models.Coin, user models.User) error {
+	_, err := r.Conn.ExecEx(ctx, "UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3)", nil, coin.EntryPrice, user.Id, coin.Name, user.Percent*coin.EntryPrice)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

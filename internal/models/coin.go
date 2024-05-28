@@ -11,6 +11,11 @@ type Coin struct {
 	Income       float64
 }
 
+func NewCoin(userId int64, coinName string) Coin {
+	coin := Coin{UserId: userId, Name: coinName}
+	return coin
+}
+
 type List struct {
 	Name  []string
 	Buy   map[string][]float64

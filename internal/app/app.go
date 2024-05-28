@@ -65,3 +65,7 @@ func (a *App) Start(ctx context.Context) error {
 
 	return nil
 }
+
+func startTradingAfterRestart() {
+
+}

@@ -18,7 +18,7 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 		case "coin":
 			h.GetCoinList(ctx, b, update)
 		case "percent":
-			h.GetNewPercent(ctx, b, update)
+			h.UpdatePercentCmd(ctx, b, update)
 		case "replenish":
 			if len(parts) != 2 {
 				return
@@ -26,12 +26,14 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			amount, _ := strconv.ParseFloat(parts[1], 64)
 			ctx = context.WithValue(ctx, "replenishAmount", amount)
 			h.ReplenishBalance(ctx, b, update)
-		case "starttrading":
+		case "startTrading":
 			h.StartTrading(ctx, b, update)
+		case "stopTrading":
+			h.StopTrading(ctx, b, update)
 		case "delete":
-			h.DeleteCoin(ctx, b, update)
+			h.DeleteCoinCmd(ctx, b, update)
 		case "addCoin":
-			h.GetNewCoin(ctx, b, update)
+			h.AddCoinCmd(ctx, b, update)
 		default:
 			h.UnknownCommand(ctx, b, update)
 		}

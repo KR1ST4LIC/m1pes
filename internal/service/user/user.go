@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-
 	"m1pes/internal/logging"
 	"m1pes/internal/models"
 	"m1pes/internal/repository/storage/user"
@@ -30,6 +29,14 @@ func (s *Service) UpdateUser(ctx context.Context, user models.User) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Service) GetAllUsers(ctx context.Context) ([]models.User, error) {
+	users, err := s.userRepo.GetAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (s *Service) NewUser(ctx context.Context, user models.User) error {

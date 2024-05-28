@@ -73,6 +73,24 @@ func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
 	return query, values, nil
 }
 
+func (r *Repository) GetAllUsers(ctx context.Context) ([]models.User, error) {
+	rows, err := r.Conn.QueryEx(ctx, "SELECT tg_id, bal, capital, percent, status FROM users", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	users := make([]models.User, 0)
+	for rows.Next() {
+		user := models.User{}
+		err = rows.Scan(&user.Id, &user.Balance, &user.Capital, &user.Percent, &user.Status)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (r *Repository) UpdateUser(ctx context.Context, user models.User) error {
 	query, values, err := generateUpdateUserQuery(user)
 	if err != nil {

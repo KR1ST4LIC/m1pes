@@ -2,8 +2,8 @@ package algorithm
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-
 	"m1pes/internal/models"
 
 	"m1pes/internal/algorithm"
@@ -16,11 +16,11 @@ type Service struct {
 	apiRepo     apiStock.Repository
 	sStoRepo    storageStock.Repository
 	uStoRepo    storageUser.Repository
-	stopCoinMap map[string]map[int64]chan struct{}
+	stopCoinMap map[int64]map[string]chan struct{}
 }
 
 func New(apiRepo apiStock.Repository, sStoRepo storageStock.Repository, uStoRepo storageUser.Repository) *Service {
-	return &Service{apiRepo, sStoRepo, uStoRepo, make(map[string]map[int64]chan struct{})}
+	return &Service{apiRepo, sStoRepo, uStoRepo, make(map[int64]map[string]chan struct{})}
 }
 
 func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap map[int64]chan models.Message) error {
@@ -32,16 +32,19 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 	for _, coin := range coinList.Name {
 		// init map that stores coin name as key and map2 as value
 		// map2 stores userId as key and struct{} as value
-		if _, ok := s.stopCoinMap[coin][userId]; ok {
+		if _, ok := s.stopCoinMap[userId][coin]; ok {
 			continue
 		}
-		s.stopCoinMap[coin] = make(map[int64]chan struct{})
-		s.stopCoinMap[coin][userId] = make(chan struct{})
+
+		if _, ok := s.stopCoinMap[userId]; !ok {
+			s.stopCoinMap[userId] = make(map[string]chan struct{})
+		}
+		s.stopCoinMap[userId][coin] = make(chan struct{})
 		go func(funcCoin string) {
 			for {
 				select {
-				case <-s.stopCoinMap[funcCoin][userId]:
-					delete(s.stopCoinMap[funcCoin], userId)
+				case <-s.stopCoinMap[userId][funcCoin]:
+					delete(s.stopCoinMap[userId], funcCoin)
 					return
 				default:
 					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
@@ -64,6 +67,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 					status := algorithm.Algorithm(currentPrice, &coin, &user)
 
+					fmt.Println(funcCoin)
+
 					msg := models.Message{
 						User: user,
 						Coin: coin,
@@ -71,7 +76,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 					switch status {
 					case algorithm.ChangeAction:
-						err = s.sStoRepo.UpdateCoin(userId, coin.Name, coin.EntryPrice, user.Percent)
+						err = s.sStoRepo.ResetCoin(ctx, coin, user)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update coin", err)
 							return
@@ -79,7 +84,12 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					case algorithm.WaitAction:
 						continue
 					case algorithm.BuyAction:
-						err = s.sStoRepo.UpdateCount(userId, coin.Count, coin.Name, coin.Decrement, coin.Buy)
+						updateCoin := models.NewCoin(user.Id, coin.Name)
+						updateCoin.Buy = coin.Buy
+						updateCoin.Count = coin.Count
+						updateCoin.Decrement = coin.Decrement
+
+						err = s.sStoRepo.UpdateCoin(ctx, updateCoin)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update count", err)
 							return
@@ -102,13 +112,26 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 				}
 			}
 		}(coin)
+		//time.Sleep(time.Millisecond * 500)
+		//fmt.Println(s.stopCoinMap)
+	}
+	return nil
+}
+
+func (s *Service) StopTrading(ctx context.Context, userID int64) error {
+	//fmt.Println(s.stopCoinMap)
+
+	for coinName := range s.stopCoinMap[userID] {
+		s.stopCoinMap[userID][coinName] <- struct{}{}
+		//fmt.Println(coinName)
+		//fmt.Println(s.stopCoinMap)
 	}
 	return nil
 }
 
 func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) error {
-	if _, ok := s.stopCoinMap[coinTag][userId]; ok {
-		s.stopCoinMap[coinTag][userId] <- struct{}{}
+	if _, ok := s.stopCoinMap[userId][coinTag]; ok {
+		s.stopCoinMap[userId][coinTag] <- struct{}{}
 	}
 
 	currentPrice, err := s.apiRepo.GetPrice(ctx, coinTag)

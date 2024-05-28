@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"m1pes/internal/algorithm"
 	"strconv"
 	"strings"
-
-	"m1pes/internal/algorithm"
 
 	"m1pes/internal/logging"
 
@@ -28,6 +27,7 @@ type (
 
 	UserService interface {
 		UpdateUser(ctx context.Context, user models.User) error
+		GetAllUsers(ctx context.Context) ([]models.User, error)
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
 		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
@@ -35,6 +35,7 @@ type (
 
 	AlgorithmService interface {
 		StartTrading(ctx context.Context, userId int64, actionChanMap map[int64]chan models.Message) error
+		StopTrading(ctx context.Context, userID int64) error
 		DeleteCoin(ctx context.Context, userId int64, coin string) error
 	}
 )
@@ -47,8 +48,26 @@ type Handler struct {
 }
 
 func New(ss StockService, us UserService, as AlgorithmService) *Handler {
-	return &Handler{ss: ss, us: us, as: as, actionChanMap: make(map[int64]chan models.Message)}
+	ctx := context.Background()
+
+	h := &Handler{ss: ss, us: us, as: as, actionChanMap: make(map[int64]chan models.Message)}
+
+	users, err := h.us.GetAllUsers(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	for _, user := range users {
+		err = h.as.StartTrading(ctx, user.Id, h.actionChanMap)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	return h
 }
+
+// Handlers with Cmd at the end need for setting new status for user, after them should be normal handler.
 
 func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
@@ -119,7 +138,16 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 	}
 }
 
-func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	err := h.as.StopTrading(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
+	}
+}
+
+func (h *Handler) DeleteCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
 	user := models.NewUser(update.Message.From.ID)
@@ -134,6 +162,24 @@ func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	_, err = b.Send(msg)
 	if err != nil {
 		log.Println(err)
+	}
+}
+
+func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	err := h.as.DeleteCoin(ctx, update.Message.From.ID, update.Message.Text)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты не торгуешь на этой монете, чтобы посмотреть список монет - /coin")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
+		}
+	} else {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты удалил эту монету!")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
+		}
 	}
 }
 
@@ -180,7 +226,7 @@ func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, upda
 	}
 }
 
-func (h *Handler) GetNewPercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) UpdatePercentCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
 	user := models.NewUser(update.Message.From.ID)
@@ -198,7 +244,54 @@ func (h *Handler) GetNewPercent(ctx context.Context, b *tgbotapi.BotAPI, update 
 	}
 }
 
-func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+func (h *Handler) UpdatePercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	text := strings.Replace(update.Message.Text, ",", ".", -1)
+	percent, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		log.Println(err)
+	}
+	if percent >= 0.25 && percent <= 20 {
+		user := models.NewUser(update.Message.From.ID)
+		user.Percent = percent * 0.01
+
+		err = h.us.UpdateUser(ctx, user)
+		if err != nil {
+			log.Println(err)
+		}
+
+		user = models.NewUser(update.Message.From.ID)
+		user.Status = "none"
+
+		err = h.us.UpdateUser(ctx, user)
+		if err != nil {
+			log.Println(err)
+		}
+
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Процент торговли успешно изменен")
+		_, err := b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+		user := models.NewUser(update.Message.From.ID)
+		user.Status = "none"
+
+		err = h.us.UpdateUser(ctx, user)
+		if err != nil {
+			log.Println(err)
+		}
+
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неправильно введены проценты. Максимальное значение процентов - 20, а минимальное - 0.25 попробуйте ещё раз - /percent")
+		_, err := b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
 	list, err := h.ss.GetCoinList(ctx, update.Message.Chat.ID)
@@ -228,6 +321,51 @@ func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	}
 }
 
+func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	can, err := h.ss.ExistCoin(ctx, update.Message.Text)
+	if err != nil {
+		log.Println(err)
+	}
+	if can {
+		coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}
+
+		err = h.ss.AddCoin(coin)
+		if err != nil {
+			log.Println(err)
+		}
+
+		user := models.NewUser(update.Message.From.ID)
+		user.Status = "none"
+
+		err = h.us.UpdateUser(ctx, user)
+		if err != nil {
+			log.Println(err)
+		}
+
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Монета успешно добавленна")
+		_, err := b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+		user := models.NewUser(update.Message.From.ID)
+		user.Status = "none"
+
+		err = h.us.UpdateUser(ctx, user)
+		if err != nil {
+			log.Println(err)
+		}
+
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Такой монеты не существует попробуйте ещё раз - /addCoin")
+		_, err := b.Send(msg)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
 func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
@@ -235,108 +373,14 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println(user)
+
 	switch user.Status {
 	case "updatePercent":
-		text := strings.Replace(update.Message.Text, ",", ".", -1)
-		percent, err := strconv.ParseFloat(text, 64)
-		if err != nil {
-			log.Println(err)
-		}
-		if percent >= 0.25 && percent <= 20 {
-			user = models.NewUser(update.Message.From.ID)
-			user.Percent = percent * 0.01
-
-			err = h.us.UpdateUser(ctx, user)
-			if err != nil {
-				log.Println(err)
-			}
-
-			user = models.NewUser(update.Message.From.ID)
-			user.Status = "none"
-
-			err = h.us.UpdateUser(ctx, user)
-			if err != nil {
-				log.Println(err)
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Процент торговли успешно изменен")
-			_, err := b.Send(msg)
-			if err != nil {
-				log.Println(err)
-			}
-		} else {
-			user := models.NewUser(update.Message.From.ID)
-			user.Status = "none"
-
-			err = h.us.UpdateUser(ctx, user)
-			if err != nil {
-				log.Println(err)
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неправильно введены проценты. Максимальное значение процентов - 20, а минимальное - 0.25 попробуйте ещё раз - /percent")
-			_, err := b.Send(msg)
-			if err != nil {
-				log.Println(err)
-			}
-		}
+		h.UpdatePercentCmd(ctx, b, update)
 	case "addCoin":
-		can, err := h.ss.ExistCoin(ctx, update.Message.Text)
-		if err != nil {
-			log.Println(err)
-		}
-		if can {
-			coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}
-
-			err = h.ss.AddCoin(coin)
-			if err != nil {
-				log.Println(err)
-			}
-
-			user := models.NewUser(update.Message.From.ID)
-			user.Status = "none"
-
-			err = h.us.UpdateUser(ctx, user)
-			if err != nil {
-				log.Println(err)
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Монета успешно добавленна")
-			_, err := b.Send(msg)
-			if err != nil {
-				log.Println(err)
-			}
-		} else {
-			user := models.NewUser(update.Message.From.ID)
-			user.Status = "none"
-
-			err = h.us.UpdateUser(ctx, user)
-			if err != nil {
-				log.Println(err)
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Такой монеты не существует попробуйте ещё раз - /addCoin")
-			_, err := b.Send(msg)
-			if err != nil {
-				log.Println(err)
-			}
-		}
+		h.AddCoin(ctx, b, update)
 	case "deleteCoin":
-		err = h.as.DeleteCoin(ctx, update.Message.From.ID, update.Message.Text)
-		if err != nil {
-			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты не торгуешь на этой монете, чтобы посмотреть список монет - /coin")
-			_, err = b.Send(msg)
-			if err != nil {
-				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
-			}
-		} else {
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты удалил эту монету!")
-			_, err = b.Send(msg)
-			if err != nil {
-				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
-			}
-		}
+		h.DeleteCoin(ctx, b, update)
 	default:
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Такой команды нет")
 		_, err := b.Send(msg)

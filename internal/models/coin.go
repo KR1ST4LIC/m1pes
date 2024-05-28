@@ -10,3 +10,9 @@ type Coin struct {
 	Buy          []float64
 	Income       float64
 }
+
+type List struct {
+	Name  []string
+	Buy   map[string][]float64
+	Count []float64
+}

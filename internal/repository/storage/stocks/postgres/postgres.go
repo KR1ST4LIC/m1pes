@@ -126,3 +126,12 @@ func (r *Repository) SellAction(userID int64, coinTag string, currentPrice, decr
 
 	return nil
 }
+
+func (r *Repository) InsertIncome(userID int64, coinTag string, income, count float64) error {
+	_, err := r.Conn.Exec("INSERT INTO income (user_id, coin_name,income,count) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING;", userID, coinTag, income, count)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

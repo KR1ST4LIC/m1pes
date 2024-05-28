@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"m1pes/internal/logging"
 	"m1pes/internal/models"
 	"m1pes/internal/repository/storage/user"
@@ -15,7 +16,7 @@ func New(userRepo user.Repository) *Service {
 	return &Service{userRepo: userRepo}
 }
 
-func (s *Service) ReplenishBalance(ctx context.Context, userId, amount int64) error {
+func (s *Service) ReplenishBalance(ctx context.Context, userId int64, amount float64) error {
 	err := s.userRepo.ChangeBalance(ctx, userId, amount)
 	if err != nil {
 		return err

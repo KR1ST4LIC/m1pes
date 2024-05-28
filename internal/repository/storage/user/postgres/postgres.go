@@ -30,7 +30,7 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
-func (r *Repository) ChangeBalance(ctx context.Context, userId, amount int64) error {
+func (r *Repository) ChangeBalance(ctx context.Context, userId int64, amount float64) error {
 	_, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func (r *Repository) ChangeBalance(ctx context.Context, userId, amount int64) er
 }
 
 func (r *Repository) NewUser(ctx context.Context, user models.User) error {
-	_, err := r.Conn.ExecEx(ctx, "INSERT INTO users(tg_id, bal, capital, percent, income) VALUES($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING;", nil, user.Id, user.Balance, user.Capital, 0.01, user.Income)
+	_, err := r.Conn.ExecEx(ctx, "INSERT INTO users(tg_id, percent) VALUES($1, $2) ON CONFLICT DO NOTHING;", nil, user.Id, 0.01)
 	if err != nil {
 		return err
 	}
@@ -48,8 +48,8 @@ func (r *Repository) NewUser(ctx context.Context, user models.User) error {
 
 func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
 	var user models.User
-	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, income FROM users WHERE tg_id=$1", nil, userId)
-	err := res.Scan(&user.Balance, &user.Capital, &user.Percent, &user.Income)
+	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent FROM users WHERE tg_id=$1", nil, userId)
+	err := res.Scan(&user.Balance, &user.Capital, &user.Percent)
 	if err != nil {
 		return models.User{}, err
 	}

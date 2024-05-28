@@ -47,7 +47,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					return
 				default:
 					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
-					fmt.Scan(&currentPrice)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting price from algorithm", err)
 						return

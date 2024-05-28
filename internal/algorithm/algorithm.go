@@ -37,6 +37,8 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) strin
 	if avg+user.Percent*avg <= currentPrice {
 		//sell
 		coin.Decrement = coin.EntryPrice * user.Percent
+
+		coin.Income = (currentPrice - avg) * coin.Count
 		return SellAction
 	}
 	return WaitAction

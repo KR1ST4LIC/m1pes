@@ -8,4 +8,5 @@ type Coin struct {
 	Decrement    float64
 	Count        float64
 	Buy          []float64
+	Income       float64
 }

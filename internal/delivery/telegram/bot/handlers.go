@@ -26,12 +26,13 @@ type (
 		CheckStatus(userId int64) (string, error)
 		UpdateStatus(userID int64, status string) error
 		UpdatePercent(userID int64, percent float64) error
+		InsertIncome(userID int64, coinTag string, income, count float64) error
 	}
 
 	UserService interface {
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
-		ReplenishBalance(ctx context.Context, userId, amount int64) error
+		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
 	}
 
 	AlgorithmService interface {
@@ -89,10 +90,15 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 				var text string
 				switch msg.Action {
 				case algorithm.SellAction:
-					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count)
+					err = h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
+					if err != nil {
+						slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
+					}
+					err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
+					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
 					text = "ПРОДАЖА\n" + def
 				case algorithm.BuyAction:
-					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
+					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
 					text = "ПОКУПКА\n" + def
 				}
 
@@ -159,7 +165,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
-	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(int64))
+	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(float64))
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
 	}

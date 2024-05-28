@@ -58,9 +58,11 @@ func New(ss StockService, us UserService, as AlgorithmService) *Handler {
 	}
 
 	for _, user := range users {
-		err = h.as.StartTrading(ctx, user.Id, h.actionChanMap)
-		if err != nil {
-			log.Fatalln(err)
+		if user.TradingActivated {
+			err = h.as.StartTrading(ctx, user.Id, h.actionChanMap)
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
 	}
 

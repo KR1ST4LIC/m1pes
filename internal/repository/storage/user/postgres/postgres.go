@@ -62,6 +62,9 @@ func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
 		values = append(values, user.Status)
 		i++
 	}
+	setClauses = append(setClauses, fmt.Sprintf("trading_activated = $%d", i))
+	values = append(values, user.TradingActivated)
+	i++
 
 	if len(setClauses) == 0 {
 		return "", nil, fmt.Errorf("no fields to update")
@@ -74,7 +77,7 @@ func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
 }
 
 func (r *Repository) GetAllUsers(ctx context.Context) ([]models.User, error) {
-	rows, err := r.Conn.QueryEx(ctx, "SELECT tg_id, bal, capital, percent, status FROM users", nil)
+	rows, err := r.Conn.QueryEx(ctx, "SELECT tg_id, bal, capital, percent, status, trading_activated FROM users", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +85,7 @@ func (r *Repository) GetAllUsers(ctx context.Context) ([]models.User, error) {
 	users := make([]models.User, 0)
 	for rows.Next() {
 		user := models.User{}
-		err = rows.Scan(&user.Id, &user.Balance, &user.Capital, &user.Percent, &user.Status)
+		err = rows.Scan(&user.Id, &user.Balance, &user.Capital, &user.Percent, &user.Status, &user.TradingActivated)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +102,6 @@ func (r *Repository) UpdateUser(ctx context.Context, user models.User) error {
 
 	_, err = r.Conn.ExecEx(ctx, query, nil, values...)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	return nil

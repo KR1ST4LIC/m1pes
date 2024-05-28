@@ -2,7 +2,6 @@ package algorithm
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"m1pes/internal/models"
 
@@ -13,10 +12,10 @@ import (
 )
 
 type Service struct {
-	apiRepo     apiStock.Repository
-	sStoRepo    storageStock.Repository
-	uStoRepo    storageUser.Repository
-	stopCoinMap map[int64]map[string]chan struct{}
+	apiRepo      apiStock.Repository
+	sStorageRepo storageStock.Repository
+	uStorageRepo storageUser.Repository
+	stopCoinMap  map[int64]map[string]chan struct{}
 }
 
 func New(apiRepo apiStock.Repository, sStoRepo storageStock.Repository, uStoRepo storageUser.Repository) *Service {
@@ -24,7 +23,7 @@ func New(apiRepo apiStock.Repository, sStoRepo storageStock.Repository, uStoRepo
 }
 
 func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap map[int64]chan models.Message) error {
-	coinList, err := s.sStoRepo.GetCoinList(ctx, userId)
+	coinList, err := s.sStorageRepo.GetCoinList(ctx, userId)
 	if err != nil {
 		return err
 	}
@@ -53,21 +52,19 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						return
 					}
 
-					user, err := s.uStoRepo.GetUser(ctx, userId)
+					user, err := s.uStorageRepo.GetUser(ctx, userId)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting user from algorithm", err)
 						return
 					}
 
-					coin, err := s.sStoRepo.GetCoin(ctx, userId, funcCoin)
+					coin, err := s.sStorageRepo.GetCoin(ctx, userId, funcCoin)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
 						return
 					}
 
 					status := algorithm.Algorithm(currentPrice, &coin, &user)
-
-					fmt.Println(funcCoin)
 
 					msg := models.Message{
 						User: user,
@@ -76,7 +73,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 					switch status {
 					case algorithm.ChangeAction:
-						err = s.sStoRepo.ResetCoin(ctx, coin, user)
+						err = s.sStorageRepo.ResetCoin(ctx, coin, user)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update coin", err)
 							return
@@ -89,7 +86,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						updateCoin.Count = coin.Count
 						updateCoin.Decrement = coin.Decrement
 
-						err = s.sStoRepo.UpdateCoin(ctx, updateCoin)
+						err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update count", err)
 							return
@@ -98,7 +95,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						actionChanMap[userId] <- msg
 					case algorithm.SellAction:
 						coin.Decrement = currentPrice * user.Percent
-						err = s.sStoRepo.SellCoin(userId, coin.Name, currentPrice, coin.Decrement)
+						err = s.sStorageRepo.SellCoin(userId, coin.Name, currentPrice, coin.Decrement)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update SellAction", err)
 							return
@@ -112,19 +109,30 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 				}
 			}
 		}(coin)
-		//time.Sleep(time.Millisecond * 500)
-		//fmt.Println(s.stopCoinMap)
 	}
+
+	user := models.NewUser(userId)
+	user.TradingActivated = true
+
+	err = s.uStorageRepo.UpdateUser(ctx, user)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *Service) StopTrading(ctx context.Context, userID int64) error {
-	//fmt.Println(s.stopCoinMap)
+	user := models.NewUser(userID)
+	user.TradingActivated = false
+
+	err := s.uStorageRepo.UpdateUser(ctx, user)
+	if err != nil {
+		return err
+	}
 
 	for coinName := range s.stopCoinMap[userID] {
 		s.stopCoinMap[userID][coinName] <- struct{}{}
-		//fmt.Println(coinName)
-		//fmt.Println(s.stopCoinMap)
 	}
 	return nil
 }
@@ -140,13 +148,13 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		return err
 	}
 
-	coin, err := s.sStoRepo.GetCoin(ctx, userId, coinTag)
+	coin, err := s.sStorageRepo.GetCoin(ctx, userId, coinTag)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin", err)
 		return err
 	}
 
-	user, err := s.uStoRepo.GetUser(ctx, userId)
+	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
 		return err
@@ -157,19 +165,19 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 
 	income := earnMoney - spentMoney
 
-	err = s.sStoRepo.DeleteCoin(ctx, userId, coinTag)
+	err = s.sStorageRepo.DeleteCoin(ctx, userId, coinTag)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error delete coin", err)
 		return err
 	}
 
-	err = s.uStoRepo.ChangeBalance(ctx, userId, income)
+	err = s.uStorageRepo.ChangeBalance(ctx, userId, income)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error change balance", err)
 		return err
 	}
 
-	err = s.sStoRepo.InsertIncome(userId, coinTag, income, coin.Count)
+	err = s.sStorageRepo.InsertIncome(userId, coinTag, income, coin.Count)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error insert income", err)
 		return err

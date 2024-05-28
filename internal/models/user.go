@@ -1,12 +1,13 @@
 package models
 
 type User struct {
-	Id      int64
-	Balance float64
-	Capital float64
-	Percent float64
-	Income  float64
-	Status  string
+	Id               int64
+	Balance          float64
+	Capital          float64
+	Percent          float64
+	Income           float64
+	Status           string
+	TradingActivated bool
 }
 
 func NewUser(userId int64) User {

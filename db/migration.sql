@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users
     "bal"     double precision default 0,
     "capital" double precision default 0,
     "percent" double precision,
+    "trading_activated" boolean,
     "status"  text             default 'none'
 );
 

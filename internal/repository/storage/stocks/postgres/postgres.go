@@ -41,21 +41,33 @@ func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string)
 	return coin, nil
 }
 
-func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]string, error) {
+func (r *Repository) GetCoinList(ctx context.Context, userId int64) (models.List, error) {
+	coinLists := models.List{}
 	var coinList []string
-	rows, err := r.Conn.QueryEx(ctx, "SELECT coin_name FROM coin WHERE user_id=$1", nil, userId)
+	buyList := make(map[string][]float64)
+	var countList []float64
+	rows, err := r.Conn.QueryEx(ctx, "SELECT coin_name, count, buy FROM coin WHERE user_id=$1;", nil, userId)
 	if err != nil {
-		return nil, err
+		return coinLists, err
 	}
 
 	var coin string
+	var buy []float64
+	var count float64
 	for rows.Next() {
-		if err = rows.Scan(&coin); err != nil {
-			return nil, err
+		if err = rows.Scan(&coin, &count, &buy); err != nil {
+			return coinLists, err
 		}
 		coinList = append(coinList, coin)
+		buyList[coin] = buy
+		countList = append(countList, count)
 	}
-	return coinList, nil
+	coinLists = models.List{
+		Name:  coinList,
+		Buy:   buyList,
+		Count: countList,
+	}
+	return coinLists, nil
 }
 
 func (r *Repository) AddCoin(coin models.Coin) error {

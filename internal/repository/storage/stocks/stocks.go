@@ -8,7 +8,7 @@ import (
 
 type Repository interface {
 	GetCoin(ctx context.Context, userId int64, coin string) (models.Coin, error)
-	GetCoinList(ctx context.Context, userId int64) ([]string, error)
+	GetCoinList(ctx context.Context, userId int64) (models.List, error)
 	AddCoin(coin models.Coin) error
 	CheckStatus(userId int64) (string, error)
 	UpdateStatus(userID int64, status string) error

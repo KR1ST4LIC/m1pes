@@ -22,10 +22,10 @@ func (s *Service) GetCoin(ctx context.Context, userId int64, coin string) {
 
 }
 
-func (s *Service) GetCoinList(ctx context.Context, userId int64) ([]string, error) {
+func (s *Service) GetCoinList(ctx context.Context, userId int64) (models.List, error) {
 	list, err := s.storageRepo.GetCoinList(ctx, userId)
 	if err != nil {
-		return nil, err
+		return list, err
 	}
 	return list, nil
 }

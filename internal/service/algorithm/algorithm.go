@@ -30,7 +30,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 		return err
 	}
 
-	for _, coin := range coinList {
+	for _, coin := range coinList.Name {
 		// init map that stores coin name as key and map2 as value
 		// map2 stores userId as key and struct{} as value
 		if _, ok := s.stopCoinMap[coin][userId]; ok {

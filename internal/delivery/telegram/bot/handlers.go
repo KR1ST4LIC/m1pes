@@ -20,7 +20,7 @@ import (
 type (
 	StockService interface {
 		GetCoin(ctx context.Context, userId int64, coin string)
-		GetCoinList(ctx context.Context, userId int64) ([]string, error)
+		GetCoinList(ctx context.Context, userId int64) (models.List, error)
 		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 		AddCoin(coin models.Coin) error
 		CheckStatus(userId int64) (string, error)
@@ -150,9 +150,18 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
 	var text string
-	text = "Ваши монеты: "
-	for i := range list {
-		text += list[i] + " "
+	text = "Ваши монеты:\n"
+	for i := 0; i < len(list.Buy); i++ {
+		var sum float64 = 0
+		for d := 0; d < len(list.Buy[list.Name[i]]); d++ {
+			sum += list.Buy[list.Name[i]][d]
+		}
+		if len(list.Buy[list.Name[i]]) != 0 {
+			avg := sum / float64(len(list.Buy[list.Name[i]]))
+			text += fmt.Sprintf("%s  купленно на: %.3f💲\n", list.Name[i], list.Count[i]*avg)
+		} else {
+			text += fmt.Sprintf("%s  купленно на: 0💲\n", list.Name[i])
+		}
 	}
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
@@ -196,7 +205,7 @@ func (h *Handler) GetNewCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	if err != nil {
 		log.Println(err)
 	}
-	if len(list) < 5 {
+	if len(list.Buy) < 5 {
 		err = h.ss.UpdateStatus(update.Message.From.ID, "addCoin")
 		if err != nil {
 			log.Println(err)

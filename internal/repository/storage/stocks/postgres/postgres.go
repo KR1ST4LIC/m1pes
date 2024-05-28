@@ -30,6 +30,15 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
+func (r *Repository) DeleteCoin(ctx context.Context, userId int64, coinTag string) error {
+	_, err := r.Conn.ExecEx(ctx, "DELETE FROM coin WHERE user_id=$1 AND coin_name=$2", nil, userId, coinTag)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
 	var coin models.Coin
 	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy FROM coin WHERE user_id=$1 AND coin_name=$2", nil, userId, coinName)
@@ -118,7 +127,7 @@ func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, de
 	return nil
 }
 
-func (r *Repository) SellAction(userID int64, coinTag string, currentPrice, decrement float64) error {
+func (r *Repository) SellCoin(userID int64, coinTag string, currentPrice, decrement float64) error {
 	_, err := r.Conn.Exec("UPDATE coin SET (decrement, count,buy,entry_price) = ($1,$2,$3,$4) WHERE (user_id,coin_name)=($5,$6)", decrement, 0, nil, currentPrice, userID, coinTag)
 	if err != nil {
 		return err
@@ -132,6 +141,5 @@ func (r *Repository) InsertIncome(userID int64, coinTag string, income, count fl
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

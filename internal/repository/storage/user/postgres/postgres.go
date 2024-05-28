@@ -30,6 +30,30 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
+func (r *Repository) CheckStatus(userId int64) (string, error) {
+	var status string
+	rows, err := r.Conn.Query("SELECT status FROM users WHERE tg_id=$1", userId)
+	if err != nil {
+		return "", err
+	}
+	var st string
+	for rows.Next() {
+		if err = rows.Scan(&st); err != nil {
+			return "", err
+		}
+		status = st
+	}
+	return status, nil
+}
+
+func (r *Repository) UpdateStatus(userID int64, status string) error {
+	_, err := r.Conn.Exec("UPDATE users SET status = $1 WHERE tg_id=$2", status, userID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) ChangeBalance(ctx context.Context, userId int64, amount float64) error {
 	_, err := r.Conn.ExecEx(ctx, "UPDATE users SET bal=bal+$1 WHERE tg_id=$2;", nil, amount, userId)
 	if err != nil {

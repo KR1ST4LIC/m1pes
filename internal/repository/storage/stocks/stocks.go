@@ -11,10 +11,9 @@ type Repository interface {
 	GetCoinList(ctx context.Context, userId int64) ([]string, error)
 	AddCoin(coin models.Coin) error
 	CheckStatus(userId int64) (string, error)
-	UpdateStatus(userID int64, status string) error
-	UpdatePercent(userID int64, percent float64) error
 	UpdateCoin(userID int64, coinTag string, entryPrice, percent float64) error
 	UpdateCount(userID int64, count float64, coinTag string, decrement float64, buy []float64) error
-	SellAction(userID int64, coinTag string, currentPrice, decrement float64) error
+	SellCoin(userID int64, coinTag string, currentPrice, decrement float64) error
+	DeleteCoin(ctx context.Context, userID int64, coinTag string) error
 	InsertIncome(userID int64, coinTag string, income, count float64) error
 }

@@ -28,10 +28,8 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			h.ReplenishBalance(ctx, b, update)
 		case "starttrading":
 			h.StartTrading(ctx, b, update)
-		case "stoptrading":
-			coin := parts[1]
-			ctx = context.WithValue(ctx, "coin", coin)
-			h.StopTrading(ctx, b, update)
+		case "delete":
+			h.DeleteCoin(ctx, b, update)
 		case "addCoin":
 			h.GetNewCoin(ctx, b, update)
 		default:

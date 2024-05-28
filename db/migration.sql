@@ -1,4 +1,4 @@
-CREATE TABLE users
+CREATE TABLE IF NOT EXISTS users
 (
     "id"      SERIAL,
     "tg_id"   bigint primary key,
@@ -7,7 +7,8 @@ CREATE TABLE users
     "percent" double precision,
     "status"  text             default 'none'
 );
-CREATE TABLE coin
+
+CREATE TABLE IF NOT EXISTS coin
 (
     "user_id"     bigint references users (tg_id),
     "coin_name"   text,
@@ -17,7 +18,8 @@ CREATE TABLE coin
     "buy"         double precision[],
     unique (coin_name, user_id)
 );
-CREATE TABLE income
+
+CREATE TABLE IF NOT EXISTS income
 (
     user_id     bigint references users (tg_id),
     "coin_name" text,

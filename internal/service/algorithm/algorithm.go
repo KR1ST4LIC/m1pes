@@ -47,7 +47,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 				default:
 					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
 					if err != nil {
-						slog.ErrorContext(ctx, "Error getting price from algorithm", err)
+						slog.ErrorContext(ctx, "Error getting price from api", err)
 						return
 					}
 
@@ -89,7 +89,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						actionChanMap[userId] <- msg
 					case algorithm.SellAction:
 						coin.Decrement = currentPrice * user.Percent
-						err = s.sStoRepo.SellAction(userId, coin.Name, currentPrice, coin.Decrement)
+						err = s.sStoRepo.SellCoin(userId, coin.Name, currentPrice, coin.Decrement)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error update SellAction", err)
 							return
@@ -107,10 +107,52 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 	return nil
 }
 
-func (s *Service) StopTradingCoin(ctx context.Context, userId int64, coin string) error {
-	if _, ok := s.stopCoinMap[coin][userId]; !ok {
+func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) error {
+	if _, ok := s.stopCoinMap[coinTag][userId]; !ok {
 		return errors.New("coin does not exist")
 	}
-	s.stopCoinMap[coin][userId] <- struct{}{}
+	s.stopCoinMap[coinTag][userId] <- struct{}{}
+
+	currentPrice, err := s.apiRepo.GetPrice(ctx, coinTag)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error getting price from api", err)
+		return err
+	}
+
+	coin, err := s.sStoRepo.GetCoin(ctx, userId, coinTag)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error getting coin", err)
+		return err
+	}
+
+	user, err := s.uStoRepo.GetUser(ctx, userId)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
+		return err
+	}
+
+	spentMoney := user.Balance * user.Percent * float64(len(coin.Buy))
+	earnMoney := currentPrice * coin.Count
+
+	income := earnMoney - spentMoney
+
+	err = s.sStoRepo.DeleteCoin(ctx, userId, coinTag)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error delete coin", err)
+		return err
+	}
+
+	err = s.uStoRepo.ChangeBalance(ctx, userId, income)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error change balance", err)
+		return err
+	}
+
+	err = s.sStoRepo.InsertIncome(userId, coinTag, income, coin.Count)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error insert income", err)
+		return err
+	}
+
 	return nil
 }

@@ -2,7 +2,6 @@ package algorithm
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"m1pes/internal/models"
@@ -108,10 +107,9 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 }
 
 func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) error {
-	if _, ok := s.stopCoinMap[coinTag][userId]; !ok {
-		return errors.New("coin does not exist")
+	if _, ok := s.stopCoinMap[coinTag][userId]; ok {
+		s.stopCoinMap[coinTag][userId] <- struct{}{}
 	}
-	s.stopCoinMap[coinTag][userId] <- struct{}{}
 
 	currentPrice, err := s.apiRepo.GetPrice(ctx, coinTag)
 	if err != nil {

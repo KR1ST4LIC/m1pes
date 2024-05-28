@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx"
 
@@ -30,25 +32,56 @@ func New(cfg config.DBConnConfig) *Repository {
 	return &Repository{Conn: conn}
 }
 
-func (r *Repository) CheckStatus(userId int64) (string, error) {
-	var status string
-	rows, err := r.Conn.Query("SELECT status FROM users WHERE tg_id=$1", userId)
-	if err != nil {
-		return "", err
+func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
+	if user.Id == 0 {
+		return "", nil, fmt.Errorf("user ID is required")
 	}
-	var st string
-	for rows.Next() {
-		if err = rows.Scan(&st); err != nil {
-			return "", err
-		}
-		status = st
+
+	tableName := "users"
+	var setClauses []string
+	var values []interface{}
+	i := 1
+
+	if user.Percent != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("percent = $%d", i))
+		values = append(values, user.Percent)
+		i++
 	}
-	return status, nil
+	if user.Balance != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("bal = $%d", i))
+		values = append(values, user.Balance)
+		i++
+	}
+	if user.Capital != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("capital = $%d", i))
+		values = append(values, user.Capital)
+		i++
+	}
+	if user.Status != "" {
+		setClauses = append(setClauses, fmt.Sprintf("status = $%d", i))
+		values = append(values, user.Status)
+		i++
+	}
+
+	if len(setClauses) == 0 {
+		return "", nil, fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE tg_id = $%d", tableName, strings.Join(setClauses, ", "), i)
+	values = append(values, user.Id)
+
+	return query, values, nil
 }
 
-func (r *Repository) UpdateStatus(userID int64, status string) error {
-	_, err := r.Conn.Exec("UPDATE users SET status = $1 WHERE tg_id=$2", status, userID)
+func (r *Repository) UpdateUser(ctx context.Context, user models.User) error {
+	query, values, err := generateUpdateUserQuery(user)
 	if err != nil {
+		return err
+	}
+
+	_, err = r.Conn.ExecEx(ctx, query, nil, values...)
+	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil
@@ -72,8 +105,8 @@ func (r *Repository) NewUser(ctx context.Context, user models.User) error {
 
 func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
 	var user models.User
-	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent FROM users WHERE tg_id=$1", nil, userId)
-	err := res.Scan(&user.Balance, &user.Capital, &user.Percent)
+	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status FROM users WHERE tg_id=$1", nil, userId)
+	err := res.Scan(&user.Balance, &user.Capital, &user.Percent, &user.Status)
 	if err != nil {
 		return models.User{}, err
 	}

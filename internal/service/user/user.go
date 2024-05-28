@@ -24,15 +24,8 @@ func (s *Service) ReplenishBalance(ctx context.Context, userId int64, amount flo
 	return nil
 }
 
-func (s *Service) CheckStatus(userId int64) (string, error) {
-	status, err := s.userRepo.CheckStatus(userId)
-	if err != nil {
-		return "", err
-	}
-	return status, nil
-}
-func (s *Service) UpdateStatus(userID int64, status string) error {
-	err := s.userRepo.UpdateStatus(userID, status)
+func (s *Service) UpdateUser(ctx context.Context, user models.User) error {
+	err := s.userRepo.UpdateUser(ctx, user)
 	if err != nil {
 		return err
 	}

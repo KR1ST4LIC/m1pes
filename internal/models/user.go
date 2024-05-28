@@ -6,6 +6,7 @@ type User struct {
 	Capital float64
 	Percent float64
 	Income  float64
+	Status  string
 }
 
 func NewUser(userId int64) User {

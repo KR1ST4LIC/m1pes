@@ -46,14 +46,6 @@ func (s *Service) AddCoin(coin models.Coin) error {
 	return nil
 }
 
-func (s *Service) UpdatePercent(userID int64, percent float64) error {
-	err := s.storageRepo.UpdatePercent(userID, percent)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *Service) InsertIncome(userID int64, coinTag string, income, count float64) error {
 	err := s.storageRepo.InsertIncome(userID, coinTag, income, count)
 	if err != nil {

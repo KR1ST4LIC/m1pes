@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx"
 
@@ -90,15 +92,52 @@ func (r *Repository) AddCoin(coin models.Coin) error {
 	return nil
 }
 
-func (r *Repository) UpdatePercent(userID int64, percent float64) error {
-	_, err := r.Conn.Exec("UPDATE users SET percent = $1 WHERE tg_id=$2", percent, userID)
-	if err != nil {
-		return err
+func generateUpdateCoinQuery(coin models.Coin) (string, error) {
+	if coin.UserId == 0 {
+		return "", fmt.Errorf("user ID is required")
 	}
-	return nil
+	if coin.Name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+
+	tableName := "coin"
+	var setClauses []string
+	var values []interface{}
+	i := 1
+
+	if coin.EntryPrice != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("entry_price = $%d", i))
+		values = append(values, coin.EntryPrice)
+		i++
+	}
+	if coin.Count != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("count = $%d", i))
+		values = append(values, coin.Count)
+		i++
+	}
+	if coin.Buy != nil {
+		setClauses = append(setClauses, fmt.Sprintf("buy = $%d", i))
+		values = append(values, coin.Buy)
+		i++
+	}
+	if coin.Decrement != 0 {
+		setClauses = append(setClauses, fmt.Sprintf("decrement = $%d", i))
+		values = append(values, coin.Decrement)
+		i++
+	}
+
+	if len(setClauses) == 0 {
+		return "", fmt.Errorf("no fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = $%d AND coin_name=$%d", tableName, strings.Join(setClauses, ", "), i, i+1)
+	values = append(values, coin.UserId, coin.Name)
+
+	return query, nil
 }
 
 func (r *Repository) UpdateCoin(userID int64, coinTag string, entryPrice, percent float64) error {
+
 	_, err := r.Conn.Exec("UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3)", entryPrice, userID, coinTag, percent*entryPrice)
 	if err != nil {
 		return err

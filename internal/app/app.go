@@ -46,7 +46,7 @@ func (a *App) Start(ctx context.Context) error {
 	algoService := algorithm.New(apiStock, storageStock, storageUser)
 
 	// init handler
-	h := handler.New(stockService, userService, algoService)
+	h := handler.New(stockService, userService, algoService, a.bot)
 
 	go func() {
 		if err := a.RunTelegramBot(ctx, h); err != nil {

@@ -43,7 +43,7 @@ func (r *Repository) DeleteCoin(ctx context.Context, userId int64, coinTag strin
 
 func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
 	var coin models.Coin
-	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy FROM coin WHERE user_id=$1 AND coin_name=$2", nil, userId, coinName)
+	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
 	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy)
 	if err != nil {
 		return coin, err
@@ -130,7 +130,7 @@ func generateUpdateCoinQuery(coin models.Coin) (string, []interface{}, error) {
 		return "", nil, fmt.Errorf("no fields to update")
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = $%d AND coin_name=$%d", tableName, strings.Join(setClauses, ", "), i, i+1)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE user_id = $%d AND coin_name=$%d", tableName, strings.Join(setClauses, ", "), i, i+1)
 	values = append(values, coin.UserId, coin.Name)
 
 	return query, values, nil

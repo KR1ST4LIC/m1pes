@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 )
 
@@ -17,12 +18,14 @@ type LogCtx struct {
 	userId int64
 }
 
+var LogCtxKey = "LogCtxKey"
+
 func (s SlogWrapper) Enabled(ctx context.Context, level slog.Level) bool {
 	return s.next.Enabled(ctx, level)
 }
 
 func (s SlogWrapper) Handle(ctx context.Context, record slog.Record) error {
-	if c, ok := ctx.Value(LogCtx{}).(LogCtx); ok {
+	if c, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
 		if c.userId != 0 {
 			record.Add("userId", c.userId)
 		}
@@ -39,7 +42,7 @@ func (s SlogWrapper) WithGroup(name string) slog.Handler {
 }
 
 func WithUserId(ctx context.Context, userId int64) context.Context {
-	return context.WithValue(ctx, LogCtx{}, LogCtx{userId: userId})
+	return context.WithValue(ctx, LogCtxKey, LogCtx{userId: userId})
 }
 
 type ErrorWithCtx struct {
@@ -53,15 +56,16 @@ func (e *ErrorWithCtx) Error() string {
 
 func WrapError(ctx context.Context, err error) error {
 	c := LogCtx{}
-	if x, ok := ctx.Value(LogCtx{}).(LogCtx); ok {
+	if x, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
 		c = x
 	}
 	return &ErrorWithCtx{next: err, ctx: c}
 }
 
 func ErrorCtx(ctx context.Context, err error) context.Context {
-	if e, ok := err.(*ErrorWithCtx); ok {
-		return context.WithValue(ctx, LogCtx{}, e.ctx)
+	var errCtx *ErrorWithCtx
+	if errors.As(err, &errCtx) {
+		return context.WithValue(ctx, LogCtxKey, errCtx.ctx)
 	}
 	return ctx
 }

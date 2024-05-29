@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"m1pes/internal/models"
 
@@ -65,6 +66,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					}
 
 					status := algorithm.Algorithm(currentPrice, &coin, &user)
+
+					fmt.Println(coin.Name)
 
 					msg := models.Message{
 						User: user,

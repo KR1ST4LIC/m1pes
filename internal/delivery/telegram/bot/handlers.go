@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"m1pes/internal/algorithm"
 	"strconv"
 	"strings"
+
+	"m1pes/internal/algorithm"
 
 	"m1pes/internal/logging"
 
@@ -73,10 +74,12 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 
 			// this goroutine waits for action from algorithm
 			go func() {
+				funcUser := user
 				for {
 					select {
-					case msg := <-h.actionChanMap[user.Id]:
+					case msg := <-h.actionChanMap[funcUser.Id]:
 						var text string
+						fmt.Println(msg.User.Id, "   ", h.actionChanMap)
 						switch msg.Action {
 						case algorithm.SellAction:
 							err = h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)

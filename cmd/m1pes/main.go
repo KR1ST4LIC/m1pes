@@ -7,23 +7,7 @@ import (
 	"m1pes/internal/app"
 )
 
-const (
-	BTC  = "BTCUSDT"
-	TON  = "TONUSDT"
-	MEME = "MEMEUSDT"
-	ETH  = "ETHUSDT"
-	LTC  = "LTCUSDT"
-)
-
-type Coin struct {
-	Decrement  float64
-	EntryPrice float64
-	Count      int64
-	Buy        []*float64
-}
-
 func main() {
-
 	ctx := context.Background()
 
 	a, err := app.New()

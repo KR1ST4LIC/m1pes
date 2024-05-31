@@ -3,10 +3,10 @@ package app
 import (
 	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"log"
 	"log/slog"
 	"m1pes/internal/config"
 	handler "m1pes/internal/delivery/telegram/bot"
+	"m1pes/internal/logging"
 	"m1pes/internal/repository/api/stocks/bybit"
 	stockPostgres "m1pes/internal/repository/storage/stocks/postgres"
 	userPostgres "m1pes/internal/repository/storage/user/postgres"
@@ -48,9 +48,16 @@ func (a *App) Start(ctx context.Context) error {
 	// init handler
 	h := handler.New(stockService, userService, algoService, a.bot)
 
+	//go func() {
+	//	err := a.ParsingPrice(ctx, c)
+	//	if err != nil {
+	//		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ParsingPrice", err)
+	//	}
+	//}()
+
 	go func() {
 		if err := a.RunTelegramBot(ctx, h); err != nil {
-			log.Println(err)
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ParsingPrice", err)
 		}
 	}()
 

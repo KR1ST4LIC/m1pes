@@ -29,17 +29,17 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 		return err
 	}
 
-	for _, coin := range coinList.Name {
+	for _, coin := range coinList {
 		// init map that stores coin name as key and map2 as value
 		// map2 stores userId as key and struct{} as value
-		if _, ok := s.stopCoinMap[userId][coin]; ok {
+		if _, ok := s.stopCoinMap[userId][coin.Name]; ok {
 			continue
 		}
 
 		if _, ok := s.stopCoinMap[userId]; !ok {
 			s.stopCoinMap[userId] = make(map[string]chan struct{})
 		}
-		s.stopCoinMap[userId][coin] = make(chan struct{})
+		s.stopCoinMap[userId][coin.Name] = make(chan struct{})
 		go func(funcCoin string) {
 			for {
 				select {
@@ -109,7 +109,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					}
 				}
 			}
-		}(coin)
+		}(coin.Name)
 	}
 
 	user := models.NewUser(userId)

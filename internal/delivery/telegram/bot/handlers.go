@@ -20,7 +20,7 @@ import (
 type (
 	StockService interface {
 		GetCoin(ctx context.Context, userId int64, coin string)
-		GetCoinList(ctx context.Context, userId int64) (models.List, error)
+		GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error)
 		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 		AddCoin(coin models.Coin) error
 		InsertIncome(userID int64, coinTag string, income, count float64) error
@@ -62,12 +62,6 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 		if user.TradingActivated {
 			ctx = logging.WithUserId(ctx, user.Id)
 
-			//user, err := h.us.GetUser(ctx, update.Message.From.ID)
-			//if err != nil {
-			//	slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
-			//}
-			//user.UpdateUserId(update.Message.From.ID)
-
 			if _, ok := h.actionChanMap[user.Id]; !ok {
 				h.actionChanMap[user.Id] = make(chan models.Message)
 			}
@@ -79,7 +73,6 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 					select {
 					case msg := <-h.actionChanMap[funcUser.Id]:
 						var text string
-						fmt.Println(msg.User.Id, "   ", h.actionChanMap)
 						switch msg.Action {
 						case algorithm.SellAction:
 							err = h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
@@ -137,12 +130,6 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 
 func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.From.ID)
-
-	//user, err := h.us.GetUser(ctx, update.Message.From.ID)
-	//if err != nil {
-	//	slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
-	//}
-	//user.UpdateUserId(update.Message.From.ID)
 
 	if _, ok := h.actionChanMap[update.Message.Chat.ID]; !ok {
 		h.actionChanMap[update.Message.Chat.ID] = make(chan models.Message)
@@ -249,16 +236,16 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	}
 	var text string
 	text = "Ваши монеты:\n"
-	for i := 0; i < len(list.Buy); i++ {
-		var sum float64 = 0
-		for d := 0; d < len(list.Buy[list.Name[i]]); d++ {
-			sum += list.Buy[list.Name[i]][d]
+	for i := 0; i < len(list); i++ {
+		var sum float64
+		for d := 0; d < len(list[i].Buy); d++ {
+			sum += list[i].Buy[d]
 		}
-		if len(list.Buy[list.Name[i]]) != 0 {
-			avg := sum / float64(len(list.Buy[list.Name[i]]))
-			text += fmt.Sprintf("%s  купленно на: %.3f💲\n", list.Name[i], list.Count[i]*avg)
+		if len(list[i].Buy) != 0 {
+			avg := sum / float64(len(list[i].Buy))
+			text += fmt.Sprintf("%s  купленно на: %.3f💲\n", list[i].Name, list[i].Count*avg)
 		} else {
-			text += fmt.Sprintf("%s  купленно на: 0💲\n", list.Name[i])
+			text += fmt.Sprintf("%s  купленно на: 0💲\n", list[i].Name)
 		}
 	}
 
@@ -355,7 +342,7 @@ func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	if err != nil {
 		log.Println(err)
 	}
-	if len(list.Buy) < 5 {
+	if len(list) < 5 {
 		user := models.NewUser(update.Message.From.ID)
 		user.Status = "addCoin"
 

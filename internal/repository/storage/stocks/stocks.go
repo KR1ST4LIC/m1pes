@@ -8,7 +8,7 @@ import (
 
 type Repository interface {
 	GetCoin(ctx context.Context, userId int64, coin string) (models.Coin, error)
-	GetCoinList(ctx context.Context, userId int64) (models.List, error)
+	GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error)
 	AddCoin(coin models.Coin) error
 	UpdateCoin(ctx context.Context, coin models.Coin) error
 	ResetCoin(ctx context.Context, coin models.Coin, user models.User) error

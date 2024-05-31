@@ -268,7 +268,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	if err != nil {
 		fmt.Println(err)
 	}
-	text += fmt.Sprintf("Сумарный закуп: %.3f\nОбщий баланс: %.3f\nЗаработал в процентах: %.3f процентов", sumarno, bal, bal/1000-100)
+	text += fmt.Sprintf("Сумарный закуп: %.3f\nОбщий баланс: %.3f\nЗаработал в процентах: %.3f%s", sumarno, bal, bal/1000-100, "%")
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	_, err = b.Send(msg)

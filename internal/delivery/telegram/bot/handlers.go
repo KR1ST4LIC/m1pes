@@ -32,6 +32,7 @@ type (
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
 		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
+		GetUserBalance(ctx context.Context, userID int64) (float64, error)
 	}
 
 	AlgorithmService interface {
@@ -248,6 +249,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
 	var text string
+	var sumarno float64
 	text = "Ваши монеты:\n"
 	for i := 0; i < len(list.Buy); i++ {
 		var sum float64 = 0
@@ -257,9 +259,15 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		if len(list.Buy[list.Name[i]]) != 0 {
 			avg := sum / float64(len(list.Buy[list.Name[i]]))
 			text += fmt.Sprintf("%s  купленно на: %.3f💲\n", list.Name[i], list.Count[i]*avg)
+			sumarno += list.Count[i] * avg
 		} else {
 			text += fmt.Sprintf("%s  купленно на: 0💲\n", list.Name[i])
 		}
+		bal, err := h.us.GetUserBalance(ctx, update.Message.From.ID)
+		if err != nil {
+			fmt.Println(err)
+		}
+		text += fmt.Sprintf("Сумарный закуп: %.3f\n общий баланс: %.3f", sumarno, bal)
 	}
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)

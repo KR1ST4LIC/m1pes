@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"m1pes/internal/logging"
 	"m1pes/internal/models"
 	"m1pes/internal/repository/storage/user"
@@ -51,6 +52,14 @@ func (s *Service) GetUser(ctx context.Context, userId int64) (models.User, error
 	u, err := s.userRepo.GetUser(ctx, userId)
 	if err != nil {
 		return models.User{}, logging.WrapError(ctx, err)
+	}
+	return u, nil
+}
+
+func (s *Service) GetUserBalance(ctx context.Context, userID int64) (float64, error) {
+	u, err := s.userRepo.GetUserBalance(ctx, userID)
+	if err != nil {
+		return 0, logging.WrapError(ctx, err)
 	}
 	return u, nil
 }

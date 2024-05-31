@@ -234,20 +234,39 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
-	var text string
-	text = "Ваши монеты:\n"
+
+	user, err := h.us.GetUser(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+	}
+
+	text := "Ваши монеты:\n"
+
+	var userSum float64
 	for i := 0; i < len(list); i++ {
-		var sum float64
+		var coinSum float64
 		for d := 0; d < len(list[i].Buy); d++ {
-			sum += list[i].Buy[d]
+			coinSum += list[i].Buy[d]
 		}
+
 		if len(list[i].Buy) != 0 {
-			avg := sum / float64(len(list[i].Buy))
+			avg := coinSum / float64(len(list[i].Buy))
+
+			userSum += list[i].Count * avg
+
 			text += fmt.Sprintf("%s  купленно на: %.3f💲\n", list[i].Name, list[i].Count*avg)
 		} else {
 			text += fmt.Sprintf("%s  купленно на: 0💲\n", list[i].Name)
 		}
 	}
+
+	text += fmt.Sprintf("\nСумарный закуп: %.3f\n", userSum)
+
+	text += fmt.Sprintf("\nОбщий баланс: %.4f\n", user.Balance)
+
+	text += fmt.Sprintf("\nЗаработал в процентах: %.3f\n", 6767.003)
+
+	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	_, err = b.Send(msg)

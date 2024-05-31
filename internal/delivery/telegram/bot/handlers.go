@@ -355,7 +355,7 @@ func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	if err != nil {
 		log.Println(err)
 	}
-	if len(list.Buy) < 5 {
+	if len(list.Buy) < 7 {
 		user := models.NewUser(update.Message.From.ID)
 		user.Status = "addCoin"
 

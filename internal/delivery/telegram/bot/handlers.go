@@ -263,12 +263,12 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		} else {
 			text += fmt.Sprintf("%s  купленно на: 0💲\n", list.Name[i])
 		}
-		bal, err := h.us.GetUserBalance(ctx, update.Message.From.ID)
-		if err != nil {
-			fmt.Println(err)
-		}
-		text += fmt.Sprintf("Сумарный закуп: %.3f\n общий баланс: %.3f", sumarno, bal)
 	}
+	bal, err := h.us.GetUserBalance(ctx, update.Message.From.ID)
+	if err != nil {
+		fmt.Println(err)
+	}
+	text += fmt.Sprintf("Сумарный закуп: %.3f\n общий баланс: %.3f", sumarno, bal)
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
 	_, err = b.Send(msg)

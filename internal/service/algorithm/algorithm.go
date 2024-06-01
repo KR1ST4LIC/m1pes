@@ -155,13 +155,12 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		return err
 	}
 
-	user, err := s.uStorageRepo.GetUser(ctx, userId)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
-		return err
+	var money float64
+	for i := 0; i < len(coin.Buy); i++ {
+		money += coin.Buy[i]
 	}
-
-	spentMoney := user.Balance * user.Percent * float64(len(coin.Buy))
+	avg := money / float64(len(coin.Buy))
+	spentMoney := avg * coin.Count
 	earnMoney := currentPrice * coin.Count
 
 	income := earnMoney - spentMoney

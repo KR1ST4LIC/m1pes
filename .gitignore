@@ -2,3 +2,4 @@
 dbdata
 docker-entrypoint-initdb.d
 configs
+percent

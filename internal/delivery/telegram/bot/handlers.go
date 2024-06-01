@@ -264,7 +264,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 
 	text += fmt.Sprintf("\nОбщий баланс: %.4f\n", user.Balance)
 
-	text += fmt.Sprintf("\nЗаработал в процентах: %.3f\n", user.Balance/1000-100)
+	text += fmt.Sprintf("\nЗаработал в процентах: %.3f\n", user.Balance/1000-100) + "%"
 
 	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
 

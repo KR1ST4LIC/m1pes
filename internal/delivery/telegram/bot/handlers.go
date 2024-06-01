@@ -361,7 +361,7 @@ func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 	if err != nil {
 		log.Println(err)
 	}
-	if len(list) < 5 {
+	if len(list) < 7 {
 		user := models.NewUser(update.Message.From.ID)
 		user.Status = "addCoin"
 
@@ -376,7 +376,7 @@ func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 			log.Println(err)
 		}
 	} else {
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "У вас уже 5 монет, если хотите добавить новую - удалить старую /delete")
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "У вас уже 7 монет, если хотите добавить новую - удалить старую /delete")
 		_, err = b.Send(msg)
 		if err != nil {
 			log.Println(err)

@@ -22,7 +22,7 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) strin
 	if coin.EntryPrice-coin.Decrement >= currentPrice {
 		coin.Buy = append(coin.Buy, currentPrice) // покупать count * currentPrice
 		if coin.Count == 0 {
-			coin.Count, _ = strconv.ParseFloat(fmt.Sprintf("%.4f", coin.Count+user.Balance*0.01/currentPrice), 64)
+			coin.Count, _ = strconv.ParseFloat(fmt.Sprintf("%.4f", coin.Count+user.Balance*0.015/currentPrice), 64)
 		} else {
 			coin.Count, _ = strconv.ParseFloat(fmt.Sprintf("%.4f", coin.Count/float64(len(coin.Buy)-1)*float64(len(coin.Buy))), 64)
 		}

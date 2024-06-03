@@ -47,15 +47,15 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					delete(s.stopCoinMap[userId], funcCoin)
 					return
 				default:
-					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin)
-					if err != nil {
-						slog.ErrorContext(ctx, "Error getting price from api", err)
-						return
-					}
-
 					user, err := s.uStorageRepo.GetUser(ctx, userId)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting user from algorithm", err)
+						return
+					}
+
+					currentPrice, err := s.apiRepo.GetPrice(ctx, funcCoin, user.ApyKey)
+					if err != nil {
+						slog.ErrorContext(ctx, "Error getting price from api", err)
 						return
 					}
 
@@ -143,7 +143,12 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		s.stopCoinMap[userId][coinTag] <- struct{}{}
 	}
 
-	currentPrice, err := s.apiRepo.GetPrice(ctx, coinTag)
+	user, err := s.uStorageRepo.GetUser(ctx, userId)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error getting user", err)
+		return err
+	}
+	currentPrice, err := s.apiRepo.GetPrice(ctx, coinTag, user.ApyKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting price from api", err)
 		return err

@@ -2,6 +2,7 @@ package stocks
 
 import (
 	"context"
+	"encoding/json"
 
 	"m1pes/internal/models"
 	apiStock "m1pes/internal/repository/api/stocks"
@@ -30,8 +31,8 @@ func (s *Service) GetCoinList(ctx context.Context, userId int64) ([]models.Coin,
 	return list, nil
 }
 
-func (s *Service) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
-	list, err := s.apiRepo.ExistCoin(ctx, coinTag)
+func (s *Service) ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error) {
+	list, err := s.apiRepo.ExistCoin(ctx, coinTag, apiKey)
 	if err != nil {
 		return false, err
 	}
@@ -52,4 +53,48 @@ func (s *Service) InsertIncome(userID int64, coinTag string, income, count float
 		return err
 	}
 	return nil
+}
+
+func (s *Service) CreateOrder(endPoint, apiKey, apiSecret string, order models.OrderCreate) ([]byte, error) {
+	postParams := map[string]interface{}{
+		"category":    "spot",
+		"symbol":      order.Symbol,
+		"side":        order.Side,
+		"positionIdx": 0,
+		"orderType":   "Limit",
+		"qty":         order.Qty,
+		"price":       order.Price,
+		"timeInForce": "GTC",
+	}
+	jsonData, err := json.Marshal(postParams)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), endPoint, "", apiKey, apiSecret)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (s *Service) GetBalanceFromBybit(endPoint, apiKey, apiSecret string, order models.OrderCreate) (float64, error) {
+	postParams := map[string]interface{}{
+		"category":    "spot",
+		"symbol":      order.Symbol,
+		"side":        order.Side,
+		"positionIdx": 0,
+		"orderType":   "Limit",
+		"qty":         order.Qty,
+		"price":       order.Price,
+		"timeInForce": "GTC",
+	}
+	jsonData, err := json.Marshal(postParams)
+	if err != nil {
+		return 0, err
+	}
+	_, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), endPoint, "/v5/account/wallet-balance", apiKey, apiSecret)
+	if err != nil {
+		return 0, err
+	}
+	return 0, nil
 }

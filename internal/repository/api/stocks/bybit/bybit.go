@@ -1,18 +1,25 @@
 package bybit
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 const (
 	priceURL = "https://api.bybit.com/v2/public/tickers?symbol="
-	apiKey   = "e6jg0dLQEagHAiBvk6"
+	URL      = "https://api.bybit.com"
 )
 
 type Repository struct {
@@ -27,7 +34,7 @@ func New() *Repository {
 	}
 }
 
-func (r *Repository) GetPrice(ctx context.Context, coinTag string) (float64, error) {
+func (r *Repository) GetPrice(ctx context.Context, coinTag, apiKey string) (float64, error) {
 	url := priceURL + coinTag
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -68,7 +75,7 @@ func (r *Repository) GetPrice(ctx context.Context, coinTag string) (float64, err
 	return price, nil
 }
 
-func (r *Repository) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
+func (r *Repository) ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error) {
 	url := priceURL + coinTag
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -105,4 +112,43 @@ func (r *Repository) ExistCoin(ctx context.Context, coinTag string) (bool, error
 	}
 
 	return true, nil
+}
+
+func (r *Repository) CreateSignRequestAndGetRespBody(params, endPoint, method, apiKey, apiSecret string) ([]byte, error) {
+	timestamp := time.Now().UnixMilli()
+	hmac256 := hmac.New(sha256.New, []byte(apiSecret))
+	hmac256.Write([]byte(strconv.FormatInt(timestamp, 10) + apiKey + "5000" + params))
+	signature := hex.EncodeToString(hmac256.Sum(nil))
+
+	request, err := http.NewRequest(method, URL+endPoint+"?"+params, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed create new request")
+	}
+
+	if method == "POST" {
+		request, err = http.NewRequest(method, URL+endPoint, bytes.NewBuffer([]byte(params)))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed create new request")
+		}
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-BAPI-API-KEY", apiKey)
+	request.Header.Set("X-BAPI-SIGN", signature)
+	request.Header.Set("X-BAPI-TIMESTAMP", strconv.FormatInt(timestamp, 10))
+	request.Header.Set("X-BAPI-SIGN-TYPE", "2")
+	request.Header.Set("X-BAPI-RECV-WINDOW", "5000")
+
+	resp, err := r.cli.Do(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed do request")
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed read body")
+	}
+
+	return data, err
 }

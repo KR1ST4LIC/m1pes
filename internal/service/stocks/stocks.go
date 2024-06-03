@@ -3,11 +3,24 @@ package stocks
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
 	"m1pes/internal/models"
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"
 )
+
+type CreateOrderResponse struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	ExtCode string `json:"extCode"`
+	ExtInfo string `json:"extInfo"`
+	Result  struct {
+		OrderID     string `json:"orderId"`
+		OrderLinkID string `json:"orderLinkId"`
+	} `json:"result"`
+	TimeNow string `json:"timeNow"`
+}
 
 type Service struct {
 	apiRepo     apiStock.Repository
@@ -55,7 +68,8 @@ func (s *Service) InsertIncome(userID int64, coinTag string, income, count float
 	return nil
 }
 
-func (s *Service) CreateOrder(endPoint, apiKey, apiSecret string, order models.OrderCreate) ([]byte, error) {
+func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error) {
+	resp := models.CreateOrderResponse{}
 	postParams := map[string]interface{}{
 		"category":    "spot",
 		"symbol":      order.Symbol,
@@ -68,33 +82,36 @@ func (s *Service) CreateOrder(endPoint, apiKey, apiSecret string, order models.O
 	}
 	jsonData, err := json.Marshal(postParams)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), endPoint, "", apiKey, apiSecret)
+
+	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), "/v5/order/create", "POST", apiKey, apiSecret)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return data, nil
+
+	json.Unmarshal(data, &resp)
+	return resp.Result.OrderID, nil
 }
 
-func (s *Service) GetBalanceFromBybit(endPoint, apiKey, apiSecret string, order models.OrderCreate) (float64, error) {
-	postParams := map[string]interface{}{
-		"category":    "spot",
-		"symbol":      order.Symbol,
-		"side":        order.Side,
-		"positionIdx": 0,
-		"orderType":   "Limit",
-		"qty":         order.Qty,
-		"price":       order.Price,
-		"timeInForce": "GTC",
-	}
-	jsonData, err := json.Marshal(postParams)
+func (s *Service) GetBalanceFromBybit(apiKey, apiSecret string) (float64, error) {
+	resp := models.Response{}
+	params := "accountType=UNIFIED"
+	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return 0, err
 	}
-	_, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), endPoint, "/v5/account/wallet-balance", apiKey, apiSecret)
+	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
 	if err != nil {
 		return 0, err
 	}
-	return 0, nil
+	json.Unmarshal(data, &resp)
+	if resp.Result.List[0].TotalEquity == "" {
+		return 0, nil
+	}
+	a, err := strconv.ParseFloat(resp.Result.List[0].TotalEquity, 64)
+	if err != nil {
+		return 0, err
+	}
+	return a, nil
 }

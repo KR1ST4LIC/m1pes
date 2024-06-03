@@ -24,6 +24,8 @@ type (
 		ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error)
 		AddCoin(coin models.Coin) error
 		InsertIncome(userID int64, coinTag string, income, count float64) error
+		CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error)
+		GetBalanceFromBybit(apiKey, apiSecret string) (float64, error)
 	}
 
 	UserService interface {
@@ -245,8 +247,16 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
 	}
-
 	text := "Ваши монеты:\n"
+	bal, err := h.ss.GetBalanceFromBybit(user.ApyKey, user.SecretKey)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
+	}
+	user.Balance = bal
+	err = h.us.UpdateUser(ctx, user)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in update user", err)
+	}
 
 	var userSum float64
 	for i := 0; i < len(list); i++ {

@@ -55,11 +55,3 @@ func (s *Service) GetUser(ctx context.Context, userId int64) (models.User, error
 	}
 	return u, nil
 }
-
-func (s *Service) GetUserBalance(ctx context.Context, userID int64) (float64, error) {
-	u, err := s.userRepo.GetUserBalance(ctx, userID)
-	if err != nil {
-		return 0, logging.WrapError(ctx, err)
-	}
-	return u, nil
-}

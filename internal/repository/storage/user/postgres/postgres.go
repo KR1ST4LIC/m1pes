@@ -133,13 +133,3 @@ func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, er
 	user.Id = userId
 	return user, nil
 }
-
-func (r *Repository) GetUserBalance(ctx context.Context, userID int64) (float64, error) {
-	var bal float64
-	rows := r.Conn.QueryRowEx(ctx, "SELECT bal FROM users WHERE tg_id=$1;", nil, userID)
-	err := rows.Scan(&bal)
-	if err != nil {
-		return 0, err
-	}
-	return bal, nil
-}

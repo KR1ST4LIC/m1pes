@@ -17,9 +17,3 @@ func NewCoin(userId int64, coinName string) Coin {
 }
 
 var CoinPrice = make(map[string]float64)
-
-type List struct {
-	Name  []string
-	Buy   map[string][]float64
-	Count []float64
-}

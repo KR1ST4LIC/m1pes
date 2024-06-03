@@ -202,10 +202,16 @@ func (h *Handler) DeleteCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update 
 }
 
 func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	updateData, err := h.us.GetUser(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+	}
+
 	user := models.NewUser(update.Message.From.ID)
 	user.Status = "none"
+	user.TradingActivated = updateData.TradingActivated
 
-	err := h.us.UpdateUser(ctx, user)
+	err = h.us.UpdateUser(ctx, user)
 	if err != nil {
 		log.Println(err)
 	}

@@ -125,11 +125,29 @@ func (r *Repository) NewUser(ctx context.Context, user models.User) error {
 
 func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
 	var user models.User
-	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status,apy_key, secret_key FROM users WHERE tg_id=$1", nil, userId)
+	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status,api_key, secret_key FROM users WHERE tg_id=$1", nil, userId)
 	err := res.Scan(&user.Balance, &user.Capital, &user.Percent, &user.Status, &user.ApyKey, &user.SecretKey)
 	if err != nil {
 		return models.User{}, err
 	}
 	user.Id = userId
 	return user, nil
+}
+
+func (r *Repository) GetIncome(ctx context.Context, userId int64) (float64, error) {
+	rows, err := r.Conn.QueryEx(ctx, "SELECT income from income where time >= CURRENT_DATE AND user_id = $1;", nil, userId)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	incomes := 0.0
+	for rows.Next() {
+		income := 0.0
+		err = rows.Scan(&income)
+		if err != nil {
+			return 0, err
+		}
+		incomes += income
+	}
+	return incomes, nil
 }

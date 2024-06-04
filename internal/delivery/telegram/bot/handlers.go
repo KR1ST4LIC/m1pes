@@ -34,6 +34,7 @@ type (
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
 		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
+		GetIncomeLastDay(ctx context.Context, userID int64) (float64, error)
 	}
 
 	AlgorithmService interface {
@@ -237,16 +238,32 @@ func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 
 func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+	user, err := h.us.GetUser(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+	}
+	if user.ApyKey == "" {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет apyKey обратитесь к @n1fawin")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+		return
+	}
+	if user.SecretKey == "" {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет secretKey обратитесь к @n1fawin")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+		return
+	}
 
 	list, err := h.ss.GetCoinList(ctx, update.Message.Chat.ID)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
 
-	user, err := h.us.GetUser(ctx, update.Message.From.ID)
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
-	}
 	text := "Ваши монеты:\n"
 	bal, err := h.ss.GetBalanceFromBybit(user.ApyKey, user.SecretKey)
 	if err != nil {
@@ -256,6 +273,11 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	err = h.us.UpdateUser(ctx, user)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in update user", err)
+	}
+
+	income, err := h.us.GetIncomeLastDay(ctx, user.Id)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get income", err)
 	}
 
 	var userSum float64
@@ -280,7 +302,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 
 	text += fmt.Sprintf("\nОбщий баланс: %.4f", user.Balance)
 
-	text += fmt.Sprintf("\nЗаработал в процентах: %.3f", user.Balance/1000-100) + "%"
+	text += fmt.Sprintf("\nЗаработал в процентах за последний день: %.3f", income/user.Balance*100) + "%"
 
 	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
 

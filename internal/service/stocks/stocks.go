@@ -97,17 +97,17 @@ func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate
 func (s *Service) GetBalanceFromBybit(apiKey, apiSecret string) (float64, error) {
 	resp := models.Response{}
 	params := "accountType=UNIFIED"
-	jsonData, err := json.Marshal(params)
-	if err != nil {
-		return 0, err
-	}
-	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
+	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(params, "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
 	if err != nil {
 		return 0, err
 	}
 	json.Unmarshal(data, &resp)
-	if resp.Result.List[0].TotalEquity == "" {
-		return 0, nil
+	if resp.RetMsg == "OK" {
+		if resp.Result.List[0].TotalEquity == "" {
+			return 0, nil
+		}
+	} else {
+		return 0, err
 	}
 	a, err := strconv.ParseFloat(resp.Result.List[0].TotalEquity, 64)
 	if err != nil {

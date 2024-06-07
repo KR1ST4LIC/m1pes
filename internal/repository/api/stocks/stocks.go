@@ -1,6 +1,8 @@
 package stocks
 
-import "context"
+import (
+	"context"
+)
 
 type Repository interface {
 	GetPrice(ctx context.Context, coinTag, apiKey string) (float64, error)

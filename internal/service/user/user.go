@@ -40,6 +40,14 @@ func (s *Service) GetAllUsers(ctx context.Context) ([]models.User, error) {
 	return users, nil
 }
 
+func (s *Service) GetIncomeLastDay(ctx context.Context, userID int64) (float64, error) {
+	income, err := s.userRepo.GetIncome(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	return income, nil
+}
+
 func (s *Service) NewUser(ctx context.Context, user models.User) error {
 	err := s.userRepo.NewUser(ctx, user)
 	if err != nil {

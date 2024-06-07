@@ -24,6 +24,8 @@ type (
 		ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error)
 		AddCoin(coin models.Coin) error
 		InsertIncome(userID int64, coinTag string, income, count float64) error
+		CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error)
+		GetBalanceFromBybit(apiKey, apiSecret string) (float64, error)
 	}
 
 	UserService interface {
@@ -32,6 +34,7 @@ type (
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
 		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
+		GetIncomeLastDay(ctx context.Context, userID int64) (float64, error)
 	}
 
 	AlgorithmService interface {
@@ -235,18 +238,47 @@ func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 
 func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+	user, err := h.us.GetUser(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+	}
+	if user.ApiKey == "" {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет apyKey обратитесь к @n1fawin")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+		return
+	}
+	if user.SecretKey == "" {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет secretKey обратитесь к @n1fawin")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+		return
+	}
 
 	list, err := h.ss.GetCoinList(ctx, update.Message.Chat.ID)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StockService.GetCoinList", err)
 	}
 
-	user, err := h.us.GetUser(ctx, update.Message.From.ID)
+	text := "Ваши монеты:\n"
+	bal, err := h.ss.GetBalanceFromBybit(user.ApiKey, user.SecretKey)
 	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
+	}
+	user.Balance = bal
+	err = h.us.UpdateUser(ctx, user)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in update user", err)
 	}
 
-	text := "Ваши монеты:\n"
+	income, err := h.us.GetIncomeLastDay(ctx, user.Id)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get income", err)
+	}
 
 	var userSum float64
 	for i := 0; i < len(list); i++ {
@@ -267,8 +299,11 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	}
 
 	text += fmt.Sprintf("\nСумарный закуп: %.3f", userSum)
+
 	text += fmt.Sprintf("\nОбщий баланс: %.4f", user.Balance)
-	text += fmt.Sprintf("\nЗаработал в процентах: %.3f", user.Balance/1000-100) + "%"
+
+	text += fmt.Sprintf("\nЗаработал в процентах за последний день: %.3f", income/user.Balance*100) + "%"
+
 	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)

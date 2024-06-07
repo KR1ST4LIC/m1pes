@@ -7,9 +7,9 @@ services:
       POSTGRES_USER: m1pes-user
       POSTGRES_PASSWORD: m1pepass
       POSTGRES_HOST_AUTH_METHOD: "trust"
-#      PGDATA: "/var/lib/postgresql/data/pgdata"
-#    volumes:
-#      - ./dbdata:/var/lib/postgresql/data
-#      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./dbdata:/var/lib/postgresql/data
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"

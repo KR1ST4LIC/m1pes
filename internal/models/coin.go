@@ -13,13 +13,6 @@ type Coin struct {
 	Income       float64
 }
 
-type OrderCreate struct {
-	Symbol string
-	Side   string
-	Qty    string
-	Price  string
-}
-
 func NewCoin(userId int64, coinName string) Coin {
 	coin := Coin{UserId: userId, Name: coinName}
 	return coin

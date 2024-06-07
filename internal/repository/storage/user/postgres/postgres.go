@@ -133,3 +133,21 @@ func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, er
 	user.Id = userId
 	return user, nil
 }
+
+func (r *Repository) GetIncome(ctx context.Context, userId int64) (float64, error) {
+	rows, err := r.Conn.QueryEx(ctx, "SELECT income from income where time >= CURRENT_DATE AND user_id = $1;", nil, userId)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	incomes := 0.0
+	for rows.Next() {
+		income := 0.0
+		err = rows.Scan(&income)
+		if err != nil {
+			return 0, err
+		}
+		incomes += income
+	}
+	return incomes, nil
+}

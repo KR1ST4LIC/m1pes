@@ -1,5 +1,22 @@
 package models
 
+type GetCoinRequest struct {
+	Category string `json:"category"`
+	Symbol   string `json:"symbol"`
+}
+
+type GetCoinResponse struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	Result  struct {
+		Category string `json:"category"`
+		List     []struct {
+			Symbol string `json:"symbol"`
+			Price  string `json:"lastPrice"`
+		} `json:"list"`
+	} `json:"result"`
+}
+
 type CreateOrderRequest struct {
 	Category    string `json:"category"`
 	Side        string `json:"side"`
@@ -55,4 +72,28 @@ type GetOrderResponse struct {
 		Qty         string `json:"qty"`
 		Side        string `json:"side"`
 	} `json:"list"`
+}
+
+type OrderCreate struct {
+	Symbol string
+	Side   string
+	Qty    string
+	Price  string
+}
+
+type Response struct {
+	RetCode    int      `json:"retCode"`
+	RetMsg     string   `json:"retMsg"`
+	Result     Result   `json:"result"`
+	RetExtInfo struct{} `json:"retExtInfo"`
+	Time       int64    `json:"time"`
+}
+
+type Result struct {
+	List []Account `json:"list"`
+}
+
+type Account struct {
+	TotalEquity        string `json:"totalEquity"`
+	TotalWalletBalance string `json:"totalWalletBalance"`
 }

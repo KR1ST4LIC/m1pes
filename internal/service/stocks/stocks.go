@@ -3,11 +3,10 @@ package stocks
 import (
 	"context"
 	"encoding/json"
-	"strconv"
-
 	"m1pes/internal/models"
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"
+	"strconv"
 )
 
 type CreateOrderResponse struct {

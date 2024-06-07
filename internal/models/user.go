@@ -6,7 +6,7 @@ type User struct {
 	Capital          float64
 	Percent          float64
 	Income           float64
-	ApyKey           string
+	ApiKey           string
 	SecretKey        string
 	Status           string
 	TradingActivated bool

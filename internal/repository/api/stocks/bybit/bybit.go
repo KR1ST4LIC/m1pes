@@ -71,7 +71,9 @@ func (r *Repository) GetPrice(ctx context.Context, coinTag, apiKey string) (floa
 	}
 
 	bidPrice := result[0].(map[string]interface{})["bid_price"].(string)
+
 	price, _ := strconv.ParseFloat(bidPrice, 64)
+
 	return price, nil
 }
 

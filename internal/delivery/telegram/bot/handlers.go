@@ -267,11 +267,8 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	}
 
 	text += fmt.Sprintf("\nСумарный закуп: %.3f", userSum)
-
 	text += fmt.Sprintf("\nОбщий баланс: %.4f", user.Balance)
-
 	text += fmt.Sprintf("\nЗаработал в процентах: %.3f", user.Balance/1000-100) + "%"
-
 	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
@@ -396,7 +393,7 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 	if err != nil {
 		log.Println(err)
 	}
-	can, err := h.ss.ExistCoin(ctx, update.Message.Text, user.ApyKey)
+	can, err := h.ss.ExistCoin(ctx, update.Message.Text, user.ApiKey)
 	if err != nil {
 		log.Println(err)
 	}

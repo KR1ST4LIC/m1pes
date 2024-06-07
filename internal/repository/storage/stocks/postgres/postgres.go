@@ -43,8 +43,8 @@ func (r *Repository) DeleteCoin(ctx context.Context, userId int64, coinTag strin
 
 func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
 	var coin models.Coin
-	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
-	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy)
+	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy, buy_order_id, sell_order_id FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
+	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy, &coin.BuyOrderId, &coin.SellOrderId)
 	if err != nil {
 		return coin, err
 	}
@@ -54,14 +54,14 @@ func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string)
 
 func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error) {
 	coinList := make([]models.Coin, 0)
-	rows, err := r.Conn.QueryEx(ctx, "SELECT coin_name, count, buy, entry_price, user_id, decrement FROM coin WHERE user_id=$1;", nil, userId)
+	rows, err := r.Conn.QueryEx(ctx, "SELECT coin_name, count, buy, entry_price, user_id, decrement, buy_order_id, sell_order_id FROM coin WHERE user_id=$1;", nil, userId)
 	if err != nil {
 		return nil, err
 	}
 
 	for rows.Next() {
 		coin := models.Coin{}
-		if err = rows.Scan(&coin.Name, &coin.Count, &coin.Buy, &coin.EntryPrice, &coin.UserId, &coin.Decrement); err != nil {
+		if err = rows.Scan(&coin.Name, &coin.Count, &coin.Buy, &coin.EntryPrice, &coin.UserId, &coin.Decrement, &coin.BuyOrderId, &coin.SellOrderId); err != nil {
 			return nil, err
 		}
 		coinList = append(coinList, coin)
@@ -114,6 +114,16 @@ func generateUpdateCoinQuery(coin models.Coin) (string, []interface{}, error) {
 		values = append(values, coin.Decrement)
 		i++
 	}
+	if coin.BuyOrderId != "" {
+		setClauses = append(setClauses, fmt.Sprintf("buy_order_id = $%d", i))
+		values = append(values, coin.BuyOrderId)
+		i++
+	}
+	if coin.SellOrderId != "" {
+		setClauses = append(setClauses, fmt.Sprintf("sell_order_id = $%d", i))
+		values = append(values, coin.SellOrderId)
+		i++
+	}
 
 	if len(setClauses) == 0 {
 		return "", nil, fmt.Errorf("no fields to update")
@@ -139,7 +149,7 @@ func (r *Repository) UpdateCoin(ctx context.Context, coin models.Coin) error {
 }
 
 func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, decrement float64, buy []float64) error {
-	_, err := r.Conn.Exec("UPDATE coin SET (decrement, count,buy) = ($1,$2,$3) WHERE (user_id,coin_name)=($4,$5)", decrement, count, buy, userID, coinTag)
+	_, err := r.Conn.Exec("UPDATE coin SET (decrement, count,buy) = ($1,$2,$3) WHERE (user_id,coin_name)=($4,$5);", decrement, count, buy, userID, coinTag)
 	if err != nil {
 		return err
 	}
@@ -148,15 +158,15 @@ func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, de
 }
 
 func (r *Repository) ResetCoin(ctx context.Context, coin models.Coin, user models.User) error {
-	_, err := r.Conn.ExecEx(ctx, "UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3)", nil, coin.EntryPrice, user.Id, coin.Name, user.Percent*coin.EntryPrice)
+	_, err := r.Conn.ExecEx(ctx, "UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3);", nil, coin.EntryPrice, user.Id, coin.Name, user.Percent*coin.EntryPrice)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *Repository) SellCoin(userID int64, coinTag string, currentPrice, decrement float64) error {
-	_, err := r.Conn.Exec("UPDATE coin SET (decrement, count,buy,entry_price) = ($1,$2,$3,$4) WHERE (user_id,coin_name)=($5,$6)", decrement, 0, nil, currentPrice, userID, coinTag)
+func (r *Repository) SellCoin(userID int64, coinTag string, sellPrice float64) error {
+	_, err := r.Conn.Exec("UPDATE coin SET (count,buy,entry_price) = ($1,$2,$3) WHERE (user_id,coin_name)=($4,$5);", 0, nil, sellPrice, userID, coinTag)
 	if err != nil {
 		return err
 	}

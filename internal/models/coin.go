@@ -3,6 +3,8 @@ package models
 type Coin struct {
 	UserId       int64
 	Name         string
+	SellOrderId  string
+	BuyOrderId   string
 	EntryPrice   float64
 	CurrentPrice float64
 	Decrement    float64

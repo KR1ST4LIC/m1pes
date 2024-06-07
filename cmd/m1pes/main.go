@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-
 	"m1pes/internal/app"
 )
 
@@ -18,48 +17,70 @@ func main() {
 	if err = a.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
-}
 
-//package main
-//
-//import (
-//	"context"
-//	"fmt"
-//	"github.com/hirokisan/bybit/v2"
-//	"log"
-//)
-//
-//func main() {
-//	wsClient := bybit.NewWebsocketClient().WithBaseURL("wss://stream.bybit.com/v5/public/spot").WithAuth("e6jg0dLQEagHAiBvk6", "2G9xgJsp1Cl5wocmhlYBt9DQn56oM0v3psd7")
-//	svc, err := wsClient.V5().Public("spot")
-//	if err != nil {
-//		return
-//	}
-//
-//	f, err := svc.SubscribeTrade(bybit.V5WebsocketPublicTradeParamKey{Symbol: "NOTUSDT"}, func(bybit.V5WebsocketPublicTradeResponse) error {
-//		fmt.Println("herere")
-//		return nil
-//	})
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	err = svc.Ping()
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	err = f()
-//	if err != nil {
-//		log.Fatal(err, "from f func")
-//	}
-//
-//	errHandler := func(isWebsocketClosed bool, err error) {
-//		log.Fatal(err)
-//	}
-//
-//	err = svc.Start(context.Background(), errHandler)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//}
+	//createReq := models.CreateOrderRequest{
+	//	Category:    "spot",
+	//	Side:        "Buy",
+	//	Symbol:      "MEMEUSDT",
+	//	OrderType:   "Limit",
+	//	Qty:         "1.0",
+	//	Price:       "0.029",
+	//	TimeInForce: "GTC",
+	//}
+	//jsonData, err := json.Marshal(createReq)
+	//if err != nil {
+	//	slog.ErrorContext(context.Background(), "Error marshaling create order", err)
+	//}
+	//
+	//method := "POST"
+	//apiSecret := "4FtzrEEpz8UYRxDyg3vzcLw0SR48KpOdO5A5"
+	//apiKey := "ZD2sewIvQg6deMclTN"
+	//params := string(jsonData)
+	//URL := "https://api.bybit.com"
+	//endPoint := "/v5/order/create"
+	//
+	//timestamp := time.Now().UnixMilli()
+	//hmac256 := hmac.New(sha256.New, []byte(apiSecret))
+	//hmac256.Write([]byte(strconv.FormatInt(timestamp, 10) + apiKey + "5000" + params))
+	//signature := hex.EncodeToString(hmac256.Sum(nil))
+	//
+	//request, err := http.NewRequest(method, URL+endPoint+"?"+params, nil)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	//return nil, errors.Wrap(err, "failed create new request")
+	//}
+	//
+	//if method == "POST" {
+	//	request, err = http.NewRequest(method, URL+endPoint, bytes.NewBuffer([]byte(params)))
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		//return nil, errors.Wrap(err, "failed create new request")
+	//	}
+	//}
+	//
+	//request.Header.Set("Content-Type", "application/json")
+	//request.Header.Set("X-BAPI-API-KEY", apiKey)
+	//request.Header.Set("X-BAPI-SIGN", signature)
+	//request.Header.Set("X-BAPI-TIMESTAMP", strconv.FormatInt(timestamp, 10))
+	//request.Header.Set("X-BAPI-SIGN-TYPE", "2")
+	//request.Header.Set("X-BAPI-RECV-WINDOW", "5000")
+	//
+	//cli := &http.Client{}
+	//
+	//resp, err := cli.Do(request)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	//return nil, errors.Wrap(err, "failed do request")
+	//}
+	//defer resp.Body.Close()
+	//
+	//data, err := io.ReadAll(resp.Body)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	//return nil, errors.Wrap(err, "failed read body")
+	//}
+	//
+	//fmt.Println(string(data))
+	//
+	////return data, err
+}

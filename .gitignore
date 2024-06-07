@@ -1,4 +1,5 @@
 .idea
+.env
 dbdata
 docker-entrypoint-initdb.d
 configs

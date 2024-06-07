@@ -19,6 +19,8 @@ func Algorithm(currentPrice float64, coin *models.Coin, user *models.User) strin
 		coin.EntryPrice = currentPrice
 		return ChangeAction
 	}
+	fmt.Println(coin.EntryPrice-coin.Count, "\t", coin.EntryPrice)
+
 	if coin.EntryPrice-coin.Decrement >= currentPrice {
 		coin.Buy = append(coin.Buy, currentPrice) // покупать count * currentPrice
 		if coin.Count == 0 {

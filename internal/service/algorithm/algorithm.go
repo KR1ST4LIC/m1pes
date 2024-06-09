@@ -119,6 +119,12 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					if err != nil {
 						slog.ErrorContext(ctx, "Error getting coin from storage", err)
 					}
+
+					coiniks, err := s.sStorageRepo.GetCoiniks(ctx, coin.Name)
+					if err != nil {
+						slog.ErrorContext(ctx, "Error getting coiniks", err)
+						return
+					}
 					//fmt.Println(coin)
 
 					// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice
@@ -129,6 +135,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						slog.DebugContext(ctx, "Raising entry price")
 
 						coin.EntryPrice = currentPrice
+						coin.Decrement = currentPrice * user.Percent
 
 						err = s.sStorageRepo.ResetCoin(ctx, coin, user)
 						if err != nil {
@@ -161,14 +168,14 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						}
 
 						// creating new buy order
-						z := "%." + strconv.Itoa(resetedCoin.QtyDecimals) + "f"
-						y := "%." + strconv.Itoa(resetedCoin.PriceDecimals) + "f"
+						z := "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
+						y := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
 						createReq := models.CreateOrderRequest{
 							Category:    "spot",
 							Side:        "Buy",
 							Symbol:      coin.Name,
 							OrderType:   "Limit",
-							Qty:         fmt.Sprintf(z, coin.Count/float64(len(coin.Buy))),
+							Qty:         fmt.Sprintf(z, user.Balance*0.015/currentPrice),
 							MarketUint:  "baseCoin",
 							PositionIdx: 0,
 							Price:       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement), //[:len(fmt.Sprintf("%.4f", coin.EntryPrice-coin.Decrement))-1],
@@ -235,7 +242,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						slog.DebugContext(ctx, "successfully order was found")
 
 						if getOrderResp.List[0].Side == "Buy" {
-							z := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
+							z := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
 							price, err := strconv.ParseFloat(fmt.Sprintf(z, coin.EntryPrice-coin.Decrement), 64)
 							if err != nil {
 								fmt.Println(err)
@@ -252,8 +259,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 
 							// Creating new buy order
-							z = "%." + strconv.Itoa(coin.QtyDecimals) + "f"
-							g := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
+							z = "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
+							g := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
 							createReq := models.CreateOrderRequest{
 								Category:    "spot",
 								Side:        "Buy",
@@ -431,8 +438,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 
 							// creating new buy order
-							z := "%." + strconv.Itoa(coin.QtyDecimals) + "f"
-							y := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
+							z := "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
+							y := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
 							createReq := models.CreateOrderRequest{
 								Category:    "spot",
 								Side:        "Buy",

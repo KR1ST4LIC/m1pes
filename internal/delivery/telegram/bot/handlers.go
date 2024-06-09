@@ -21,7 +21,7 @@ type (
 	StockService interface {
 		GetCoin(ctx context.Context, userId int64, coin string)
 		GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error)
-		ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error)
+		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 		AddCoin(coin models.Coin) error
 		InsertIncome(userID int64, coinTag string, income, count float64) error
 		CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error)
@@ -429,13 +429,12 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 	if err != nil {
 		log.Println(err)
 	}
-	can, err := h.ss.ExistCoin(ctx, update.Message.Text, user.ApiKey)
+	can, err := h.ss.ExistCoin(ctx, update.Message.Text)
 	if err != nil {
 		log.Println(err)
 	}
 	if can {
 		coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}
-
 		err = h.ss.AddCoin(coin)
 		if err != nil {
 			log.Println(err)

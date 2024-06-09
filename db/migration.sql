@@ -33,4 +33,11 @@ CREATE TABLE IF NOT EXISTS income
     "count"     double precision default 0,
     "income"    double precision default 0,
     "time"      timestamp        default now() not null
-)
+);
+CREATE TABLE IF NOT EXISTS coiniks
+(
+    "coin_name" text,
+    "qty_decimals" int default 0,
+    "price_decimals" int default 0,
+    "min_sum_buy"  double precision default 0
+);

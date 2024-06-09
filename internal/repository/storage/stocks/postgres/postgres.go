@@ -43,8 +43,8 @@ func (r *Repository) DeleteCoin(ctx context.Context, userId int64, coinTag strin
 
 func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
 	var coin models.Coin
-	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy, buy_order_id, sell_order_id FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
-	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy, &coin.BuyOrderId, &coin.SellOrderId)
+	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy, buy_order_id, sell_order_id, qty_decimals, price_decimals FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
+	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy, &coin.BuyOrderId, &coin.SellOrderId, &coin.QtyDecimals, &coin.PriceDecimals)
 	if err != nil {
 		return coin, err
 	}

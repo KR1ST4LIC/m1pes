@@ -5,22 +5,24 @@ CREATE TABLE IF NOT EXISTS users
     "bal"               double precision default 0,
     "capital"           double precision default 0,
     "percent"           double precision,
-    "api_key"           text default '',
-    "secret_key"        text default '',
+    "api_key"           text             default '',
+    "secret_key"        text             default '',
     "trading_activated" boolean,
     "status"            text             default 'none'
 );
 
 CREATE TABLE IF NOT EXISTS coin
 (
-    "user_id"       bigint references users (tg_id),
-    "coin_name"     text,
-    "entry_price"   double precision default 0,
-    "decrement"     double precision default 0,
-    "count"         double precision default 0,
-    "buy"           double precision[],
-    "buy_order_id"  text,
-    "sell_order_id" text,
+    "user_id"        bigint references users (tg_id),
+    "coin_name"      text,
+    "entry_price"    double precision default 0,
+    "decrement"      double precision default 0,
+    "count"          double precision default 0,
+    "buy"            double precision[],
+    "buy_order_id"   text,
+    "sell_order_id"  text,
+    "qty_decimals"   int,
+    "price_decimals" int,
     unique (coin_name, user_id)
 );
 

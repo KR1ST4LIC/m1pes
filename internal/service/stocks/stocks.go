@@ -3,10 +3,11 @@ package stocks
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+
 	"m1pes/internal/models"
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"
-	"strconv"
 )
 
 type CreateOrderResponse struct {
@@ -43,8 +44,8 @@ func (s *Service) GetCoinList(ctx context.Context, userId int64) ([]models.Coin,
 	return list, nil
 }
 
-func (s *Service) ExistCoin(ctx context.Context, coinTag, apiKey string) (bool, error) {
-	list, err := s.apiRepo.ExistCoin(ctx, coinTag, apiKey)
+func (s *Service) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
+	list, err := s.storageRepo.ExistCoin(ctx, coinTag)
 	if err != nil {
 		return false, err
 	}

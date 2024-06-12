@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS coin
     "buy"            double precision[],
     "buy_order_id"   text,
     "sell_order_id"  text,
-    "qty_decimals"   int,
-    "price_decimals" int,
+    "qty_decimals"   int default 0,
+    "price_decimals" int default 0,
     unique (coin_name, user_id)
 );
 
@@ -34,7 +34,10 @@ CREATE TABLE IF NOT EXISTS income
     "income"    double precision default 0,
     "time"      timestamp        default now() not null
 );
-
-ALTER TABLE coin
-ADD COLUMN  "qty_decimals"   int default 1,
-ADD COLUMN  "price_decimals" int default 1
+CREATE TABLE IF NOT EXISTS coiniks
+(
+    "coin_name" text,
+    "qty_decimals" int default 0,
+    "price_decimals" int default 0,
+    "min_sum_buy"  double precision default 0
+);

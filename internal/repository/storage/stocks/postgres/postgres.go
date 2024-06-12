@@ -43,13 +43,34 @@ func (r *Repository) DeleteCoin(ctx context.Context, userId int64, coinTag strin
 
 func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string) (models.Coin, error) {
 	var coin models.Coin
-	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy, buy_order_id, sell_order_id, qty_decimals, price_decimals FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
-	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy, &coin.BuyOrderId, &coin.SellOrderId, &coin.QtyDecimals, &coin.PriceDecimals)
+	rows := r.Conn.QueryRowEx(ctx, "SELECT coin_name, entry_price, decrement, count, buy, buy_order_id, sell_order_id FROM coin WHERE user_id=$1 AND coin_name=$2;", nil, userId, coinName)
+	err := rows.Scan(&coin.Name, &coin.EntryPrice, &coin.Decrement, &coin.Count, &coin.Buy, &coin.BuyOrderId, &coin.SellOrderId)
 	if err != nil {
 		return coin, err
 	}
 	coin.UserId = userId
 	return coin, nil
+}
+
+func (r *Repository) GetCoiniks(ctx context.Context, coinName string) (models.Coiniks, error) {
+	var coiniks models.Coiniks
+	rows := r.Conn.QueryRowEx(ctx, "SELECT qty_decimals, price_decimals, min_sum_buy FROM coiniks WHERE coin_name=$1;", nil, coinName)
+	err := rows.Scan(&coiniks.QtyDecimals, &coiniks.PriceDecimals, &coiniks.MinSumBuy)
+	if err != nil {
+		return coiniks, err
+	}
+	coiniks.Name = coinName
+	return coiniks, nil
+}
+
+func (r *Repository) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
+	var exist bool
+	rows := r.Conn.QueryRowEx(ctx, "SELECT EXISTS(SELECT coin_name FROM coiniks WHERE coin_name = $1);", nil, coinTag)
+	err := rows.Scan(&exist)
+	if err != nil {
+		return false, err
+	}
+	return exist, nil
 }
 
 func (r *Repository) GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error) {

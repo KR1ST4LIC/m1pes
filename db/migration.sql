@@ -33,4 +33,8 @@ CREATE TABLE IF NOT EXISTS income
     "count"     double precision default 0,
     "income"    double precision default 0,
     "time"      timestamp        default now() not null
-)
+);
+
+ALTER TABLE coin
+ADD COLUMN  "qty_decimals"   int default 1,
+ADD COLUMN  "price_decimals" int default 1

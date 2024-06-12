@@ -65,38 +65,22 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						return
 					}
 
-					//currentPrice, err := s.apiRepo.GetPrice(ctx, coin.Name, user.ApiKey)
-					//if err != nil {
-					//	slog.ErrorContext(ctx, "Error getting price from api", err)
-					//	return
-					//}
+					coin, err = s.sStorageRepo.GetCoin(ctx, user.Id, coin.Name)
+					if err != nil {
+						slog.ErrorContext(ctx, "Error getting coin from storage", err)
+					}
 
-					//getCoinReq := models.GetCoinRequest{
-					//	Category: "option",
-					//	Symbol:   coin.Name,
-					//}
-					//jsonData, err := json.Marshal(getCoinReq)
-					//if err != nil {
-					//	slog.ErrorContext(ctx, "Error marshalling get coin request", err)
-					//}
+					params := make(models.GetCoinRequest)
+					params["category"] = "spot"
+					params["symbol"] = coin.Name
 
-					weirdMap := make(map[string]interface{})
-					weirdMap["category"] = "spot"
-					weirdMap["symbol"] = coin.Name
-
-					var params string
-					var i int
-					for key, val := range weirdMap {
-						if i == 0 {
-							params += fmt.Sprintf("%s=%v", key, val)
-							i++
-							continue
-						}
-						params += fmt.Sprintf("&%s=%v", key, val)
+					byteParams, err := json.Marshal(params)
+					if err != nil {
+						slog.ErrorContext(ctx, "Error marshalling params to json", err)
 					}
 
 					var getCoinResp models.GetCoinResponse
-					body, err := s.apiRepo.CreateSignRequestAndGetRespBody(params, GetCoinEndpoint, http.MethodGet, user.ApiKey, user.SecretKey)
+					body, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(byteParams), GetCoinEndpoint, http.MethodGet, user.ApiKey, user.SecretKey)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error creating get coin request", err)
 					}
@@ -106,25 +90,16 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						slog.ErrorContext(ctx, "Error unmarshalling get coin response", err)
 					}
 
-					//fmt.Println(getCoinResp)
+					if getCoinResp.RetMsg != "OK" {
+						slog.ErrorContext(ctx, "Error getting coin response: ", err)
+					}
 
 					currentPrice, err := strconv.ParseFloat(getCoinResp.Result.List[0].Price, 64)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error parsing current price to float", err)
 					}
 
-					//fmt.Println("currentPrice:", currentPrice)
-
-					coin, err = s.sStorageRepo.GetCoin(ctx, user.Id, coin.Name)
-					if err != nil {
-						slog.ErrorContext(ctx, "Error getting coin from storage", err)
-					}
-					//fmt.Println(coin)
-
-					// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice
-
-					//fmt.Println(fmt.Sprintf("curr price:%v\temtry price:%v", currentPrice, coin.EntryPrice))
-
+					// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice.
 					if currentPrice > coin.EntryPrice && coin.Count == 0 {
 						slog.DebugContext(ctx, "Raising entry price")
 
@@ -142,7 +117,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							return
 						}
 
-						// canceling buy order
+						// Canceling buy order.
 						if resetedCoin.BuyOrderId != "" {
 							cancelReq := models.CancelOrderRequest{
 								Category: "spot",
@@ -160,18 +135,19 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 						}
 
-						// creating new buy order
+						// Сreating new buy order.
 						z := "%." + strconv.Itoa(resetedCoin.QtyDecimals) + "f"
 						y := "%." + strconv.Itoa(resetedCoin.PriceDecimals) + "f"
+
 						createReq := models.CreateOrderRequest{
 							Category:    "spot",
 							Side:        "Buy",
 							Symbol:      coin.Name,
 							OrderType:   "Limit",
-							Qty:         fmt.Sprintf(z, coin.Count/float64(len(coin.Buy))),
+							Qty:         fmt.Sprintf(z, user.Balance*0.015/currentPrice),
 							MarketUint:  "baseCoin",
 							PositionIdx: 0,
-							Price:       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement), //[:len(fmt.Sprintf("%.4f", coin.EntryPrice-coin.Decrement))-1],
+							Price:       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement),
 							TimeInForce: "GTC",
 						}
 						jsonData, err := json.Marshal(createReq)
@@ -190,7 +166,9 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							slog.ErrorContext(ctx, "Error unmarshalling sign request", err)
 						}
 
-						//fmt.Println("response:", createOrderResp)
+						if createOrderResp.RetMsg != "OK" {
+							slog.ErrorContext(ctx, "Error creating order: ", createOrderResp.RetMsg)
+						}
 
 						updateCoin := models.NewCoin(user.Id, coin.Name)
 						updateCoin.BuyOrderId = createOrderResp.Result.OrderID
@@ -202,19 +180,18 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						continue
 					}
 
-					//Check buy order
-					getReq := models.GetOrderRequest{
-						Category: "spot",
-						OrderID:  coin.BuyOrderId,
-						Symbol:   coin.Name,
-					}
+					// Checking if BUY ORDER has been fulfilled.
+					getReq := make(models.GetOrderRequest)
+					getReq["category"] = "spot"
+					getReq["orderId"] = coin.BuyOrderId // <- BUY ORDER ID!
+					getReq["symbol"] = coin.Name
 
 					jsonData, err := json.Marshal(getReq)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error marshaling create order", err)
 					}
 
-					body, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), GetOrderEndpoint, http.MethodGet, user.ApiKey, user.ApiKey)
+					body, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), GetOrderEndpoint, http.MethodGet, user.ApiKey, user.SecretKey)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error creating sign request", err)
 					}
@@ -230,11 +207,10 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						slog.ErrorContext(ctx, "Error unmarshalling create order", err)
 					}
 
-					// If order is completed successfully we should to set new buy and sell order, else we are waiting
-					if getOrderResp.List[0].OrderStatus == SuccessfulOrderStatus {
-						slog.DebugContext(ctx, "successfully order was found")
+					if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus {
+						if getOrderResp.Result.List[0].Side == "Buy" {
+							slog.DebugContext(ctx, "fulfilled BUY ORDER was found")
 
-						if getOrderResp.List[0].Side == "Buy" {
 							z := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
 							price, err := strconv.ParseFloat(fmt.Sprintf(z, coin.EntryPrice-coin.Decrement), 64)
 							if err != nil {
@@ -243,7 +219,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 							coin.Buy = append(coin.Buy, price)
 
-							count, _ := strconv.ParseFloat(getOrderResp.List[0].Qty, 64)
+							count, _ := strconv.ParseFloat(getOrderResp.Result.List[0].Qty, 64)
 							coin.Count += count
 
 							err = s.sStorageRepo.UpdateCoin(ctx, coin)
@@ -251,7 +227,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Creating new buy order
+							// Creating new buy order.
 							z = "%." + strconv.Itoa(coin.QtyDecimals) + "f"
 							g := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
 							createReq := models.CreateOrderRequest{
@@ -263,12 +239,13 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								Price:       fmt.Sprintf(g, price-coin.Decrement),
 								TimeInForce: "GTC",
 							}
+
 							jsonData, err = json.Marshal(createReq)
 							if err != nil {
 								slog.ErrorContext(ctx, "Error marshaling create order", err)
 							}
 
-							body, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), CreateOrderEndpoint, "POST", user.ApiKey, user.SecretKey)
+							body, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), CreateOrderEndpoint, http.MethodPost, user.ApiKey, user.SecretKey)
 							if err != nil {
 								slog.ErrorContext(ctx, "Error creating sign request", err)
 							}
@@ -287,7 +264,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Canceling old sell order
+							// Canceling old sell order.
 							cancelReq := models.CancelOrderRequest{
 								Category: "spot",
 								OrderId:  coin.SellOrderId,
@@ -350,45 +327,47 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 
 							actionChanMap[user.Id] <- msg
+
+							continue
 						} else {
-							fmt.Println(fmt.Sprintf("броо тут какая то хуйня : %s", getOrderResp.List[0].Side))
+							fmt.Println(fmt.Sprintf("броо тут какая то хуйня : %s", getOrderResp.Result.List[0].Side))
+							continue
 						}
-
-						switch getOrderResp.List[0].Side {
-						case "Sell":
-							sellPrice, _ := strconv.ParseFloat(getOrderResp.List[0].Price, 64)
-
-							err = s.sStorageRepo.SellCoin(user.Id, coin.Name, sellPrice)
-							if err != nil {
-								slog.ErrorContext(ctx, "Error updating coin", err)
-							}
-
-							// Sending message for goroutine from handler to notify user about sell
-							msg := models.Message{
-								User:   user,
-								Coin:   coin,
-								Action: algorithm.SellAction,
-							}
-
-							coin.Count = 0
-							msg.Coin.CurrentPrice = currentPrice
-							actionChanMap[userId] <- msg
-						}
+						//
+						//switch getOrderResp.List[0].Side {
+						//case "Sell":
+						//	sellPrice, _ := strconv.ParseFloat(getOrderResp.List[0].Price, 64)
+						//
+						//	err = s.sStorageRepo.SellCoin(user.Id, coin.Name, sellPrice)
+						//	if err != nil {
+						//		slog.ErrorContext(ctx, "Error updating coin", err)
+						//	}
+						//
+						//	// Sending message for goroutine from handler to notify user about sell
+						//	msg := models.Message{
+						//		User:   user,
+						//		Coin:   coin,
+						//		Action: algorithm.SellAction,
+						//	}
+						//
+						//	coin.Count = 0
+						//	msg.Coin.CurrentPrice = currentPrice
+						//	actionChanMap[userId] <- msg
+						//}
 					}
 
-					//Check sell order
-					getReq = models.GetOrderRequest{
-						Category: "spot",
-						OrderID:  coin.SellOrderId,
-						Symbol:   coin.Name,
-					}
+					// Checking if sell order has been executed.
+					getReq = make(models.GetOrderRequest)
+					getReq["category"] = "spot"
+					getReq["orderId"] = coin.SellOrderId // <- SELL ORDER ID!
+					getReq["symbol"] = coin.Name
 
 					jsonData, err = json.Marshal(getReq)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error marshaling create order", err)
 					}
 
-					body, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), GetOrderEndpoint, http.MethodGet, user.ApiKey, user.ApiKey)
+					body, err = s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), GetOrderEndpoint, http.MethodGet, user.ApiKey, user.SecretKey)
 					if err != nil {
 						slog.ErrorContext(ctx, "Error creating sign request", err)
 					}
@@ -404,17 +383,17 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 						slog.ErrorContext(ctx, "Error unmarshalling create order", err)
 					}
 
-					if getOrderResp.List[0].OrderStatus == SuccessfulOrderStatus {
-						slog.DebugContext(ctx, "successfully order was found")
+					if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus {
+						slog.DebugContext(ctx, "successfully SELL ORDER was found")
 
-						if getOrderResp.List[0].Side == "Sell" {
-							sellPrice, _ := strconv.ParseFloat(getOrderResp.List[0].Price, 64)
+						if getOrderResp.Result.List[0].Side == "Sell" {
+							sellPrice, _ := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
 							err = s.sStorageRepo.SellCoin(user.Id, coin.Name, sellPrice)
 							if err != nil {
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Canceling old buy order
+							// Canceling old buy order.
 							cancelReq := models.CancelOrderRequest{
 								Category: "spot",
 								OrderId:  coin.BuyOrderId,
@@ -430,7 +409,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error creating sign request", err)
 							}
 
-							// creating new buy order
+							// Creating new buy order.
 							z := "%." + strconv.Itoa(coin.QtyDecimals) + "f"
 							y := "%." + strconv.Itoa(coin.PriceDecimals) + "f"
 							createReq := models.CreateOrderRequest{
@@ -461,8 +440,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error unmarshalling sign request", err)
 							}
 
-							//fmt.Println("response:", createOrderResp)
-
 							updateCoin := models.NewCoin(user.Id, coin.Name)
 							updateCoin.BuyOrderId = createOrderResp.Result.OrderID
 
@@ -481,15 +458,24 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							for i := 0; i < len(coin.Buy); i++ {
 								sum += coin.Buy[i]
 							}
+
 							avg := sum / float64(len(coin.Buy))
+
 							income := sellPrice*coin.Count - avg*coin.Count
-							s.sStorageRepo.InsertIncome(user.Id, coin.Name, income, coin.Count)
+
+							err = s.sStorageRepo.InsertIncome(user.Id, coin.Name, income, coin.Count)
+							if err != nil {
+								slog.ErrorContext(ctx, "Error inserting income", err)
+							}
+
 							coin.Count = 0
+
 							msg.Coin.CurrentPrice = sellPrice
 							msg.Coin.Income = income
+
 							actionChanMap[userId] <- msg
 						} else {
-							fmt.Println(fmt.Sprintf("броо тут какая то хуйня Sell: %s", getOrderResp.List[0].Side))
+							fmt.Println(fmt.Sprintf("броо тут какая то хуйня Sell: %s", getOrderResp.Result.List[0].Side))
 						}
 					}
 

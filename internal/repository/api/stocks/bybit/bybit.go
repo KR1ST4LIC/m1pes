@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log/slog"
@@ -117,22 +118,46 @@ func (r *Repository) ExistCoin(ctx context.Context, coinTag, apiKey string) (boo
 }
 
 func (r *Repository) CreateSignRequestAndGetRespBody(params, endPoint, method, apiKey, apiSecret string) ([]byte, error) {
+	var request *http.Request
+	switch method {
+	case http.MethodGet:
+		paramsMap := make(map[string]interface{})
+
+		err := json.Unmarshal([]byte(params), &paramsMap)
+		if err != nil {
+			return nil, err
+		}
+
+		params = ""
+		isFirst := true
+		for key, val := range paramsMap {
+			if isFirst {
+				params += fmt.Sprintf("%s=%v", key, val)
+				isFirst = false
+				continue
+			}
+			params += fmt.Sprintf("&%s=%v", key, val)
+		}
+
+		request, err = http.NewRequest(method, URL+endPoint+"?"+params, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed create new request")
+		}
+	case http.MethodPost:
+		newRequest, err := http.NewRequest(method, URL+endPoint, bytes.NewBuffer([]byte(params)))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed create new request")
+		}
+
+		request = newRequest
+	default:
+		return nil, errors.Errorf("unsupported method: %s", method)
+	}
+
 	timestamp := time.Now().UnixMilli()
 	hmac256 := hmac.New(sha256.New, []byte(apiSecret))
 	hmac256.Write([]byte(strconv.FormatInt(timestamp, 10) + apiKey + "5000" + params))
 	signature := hex.EncodeToString(hmac256.Sum(nil))
-
-	request, err := http.NewRequest(method, URL+endPoint+"?"+params, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed create new request")
-	}
-
-	if method == "POST" {
-		request, err = http.NewRequest(method, URL+endPoint, bytes.NewBuffer([]byte(params)))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed create new request")
-		}
-	}
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-BAPI-API-KEY", apiKey)

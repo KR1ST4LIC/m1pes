@@ -1,9 +1,6 @@
 package models
 
-type GetCoinRequest struct {
-	Category string `json:"category"`
-	Symbol   string `json:"symbol"`
-}
+type GetCoinRequest map[string]interface{}
 
 type GetCoinResponse struct {
 	RetCode int    `json:"retCode"`
@@ -57,21 +54,19 @@ type CancelOrderResponse struct {
 	TimeNow string `json:"timeNow"`
 }
 
-type GetOrderRequest struct {
-	Category string `json:"category"`
-	OrderID  string `json:"orderId"`
-	Symbol   string `json:"symbol"`
-}
+type GetOrderRequest map[string]interface{}
 
 type GetOrderResponse struct {
 	RetCode int    `json:"retCode"`
 	RetMsg  string `json:"retMsg"`
-	List    []struct {
-		OrderStatus string `json:"orderStatus"`
-		Price       string `json:"price"`
-		Qty         string `json:"qty"`
-		Side        string `json:"side"`
-	} `json:"list"`
+	Result  struct {
+		List []struct {
+			OrderStatus string `json:"orderStatus"`
+			Price       string `json:"price"`
+			Qty         string `json:"qty"`
+			Side        string `json:"side"`
+		} `json:"list"`
+	} `json:"result"`
 }
 
 type OrderCreate struct {

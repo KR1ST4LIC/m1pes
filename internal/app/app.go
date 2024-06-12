@@ -48,13 +48,6 @@ func (a *App) Start(ctx context.Context) error {
 	// init handler
 	h := handler.New(stockService, userService, algoService, a.bot)
 
-	//go func() {
-	//	err := a.ParsingPrice(ctx, c)
-	//	if err != nil {
-	//		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ParsingPrice", err)
-	//	}
-	//}()
-
 	go func() {
 		if err := a.RunTelegramBot(ctx, h); err != nil {
 			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ParsingPrice", err)

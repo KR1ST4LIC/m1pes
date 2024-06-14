@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS coin
     "decrement"      double precision default 0,
     "count"          double precision default 0,
     "buy"            double precision[],
-    "buy_order_id"   text,
-    "sell_order_id"  text,
+    "buy_order_id"   text default '',
+    "sell_order_id"  text default '',
     "qty_decimals"   int default 0,
     "price_decimals" int default 0,
     unique (coin_name, user_id)

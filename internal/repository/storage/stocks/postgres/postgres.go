@@ -147,7 +147,7 @@ func generateUpdateCoinQuery(coin models.Coin) (string, []interface{}, error) {
 	}
 
 	if len(setClauses) == 0 {
-		return "", nil, fmt.Errorf("no fields to update")
+		return "", nil, fmt.Errorf("from generateUpdateCoinQuery: no fields to update")
 	}
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE user_id = $%d AND coin_name=$%d", tableName, strings.Join(setClauses, ", "), i, i+1)

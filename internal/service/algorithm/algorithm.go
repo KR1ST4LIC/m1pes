@@ -125,10 +125,10 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 						// Canceling buy order.
 						if resetedCoin.BuyOrderId != "" {
-							cancelReq := map[string]interface{}{
-								"category": "spot",
-								"symbol":   resetedCoin.Name,
-								"orderId":  resetedCoin.BuyOrderId,
+							cancelReq := models.CancelOrderRequest{
+								Category: "spot",
+								OrderId:  resetedCoin.BuyOrderId,
+								Symbol:   resetedCoin.Name,
 							}
 							jsonData, err := json.Marshal(cancelReq)
 							if err != nil {
@@ -141,26 +141,27 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 						}
 
-						// creating new buy order
+						// Сreating new buy order.
 						z := "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
 						y := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
-						createReq := map[string]interface{}{
-							"category":    "spot",
-							"side":        "Buy",
-							"symbol":      coin.Name,
-							"orderType":   "Limit",
-							"qty":         fmt.Sprintf(z, user.Balance*0.015/currentPrice),
-							"marketUint":  "baseCoin",
-							"positionIdx": 0,
-							"price":       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement),
-							"timeInForce": "GTC",
+
+						createReq := models.CreateOrderRequest{
+							Category:    "spot",
+							Side:        "Buy",
+							Symbol:      coin.Name,
+							OrderType:   "Limit",
+							Qty:         fmt.Sprintf(z, user.Balance*0.015/currentPrice),
+							MarketUint:  "baseCoin",
+							PositionIdx: 0,
+							Price:       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement),
+							TimeInForce: "GTC",
 						}
 						jsonData, err := json.Marshal(createReq)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error marshaling create order", err)
 						}
 
-						body, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), CreateOrderEndpoint, "POST", user.ApiKey, user.SecretKey)
+						body, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), CreateOrderEndpoint, http.MethodPost, user.ApiKey, user.SecretKey)
 						if err != nil {
 							slog.ErrorContext(ctx, "Error creating sign request", err)
 						}
@@ -232,17 +233,17 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Creating new buy order
+							// Creating new buy order.
 							z = "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
 							g := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
-							createReq := map[string]interface{}{
-								"category":    "spot",
-								"Side":        "Buy",
-								"symbol":      coin.Name,
-								"qrderType":   "Limit",
-								"qty":         fmt.Sprintf(z, coin.Count/float64(len(coin.Buy))),
-								"price":       fmt.Sprintf(g, price-coin.Decrement),
-								"timeInForce": "GTC",
+							createReq := models.CreateOrderRequest{
+								Category:    "spot",
+								Side:        "Buy",
+								Symbol:      coin.Name,
+								OrderType:   "Limit",
+								Qty:         fmt.Sprintf(z, coin.Count/float64(len(coin.Buy))),
+								Price:       fmt.Sprintf(g, price-coin.Decrement),
+								TimeInForce: "GTC",
 							}
 
 							jsonData, err = json.Marshal(createReq)
@@ -269,11 +270,11 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Canceling old sell order
-							cancelReq := map[string]interface{}{
-								"category": "spot",
-								"orderId":  coin.SellOrderId,
-								"symbol":   coin.Name,
+							// Canceling old sell order.
+							cancelReq := models.CancelOrderRequest{
+								Category: "spot",
+								OrderId:  coin.SellOrderId,
+								Symbol:   coin.Name,
 							}
 							jsonData, err := json.Marshal(cancelReq)
 							if err != nil {
@@ -292,14 +293,14 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 							avg := sum / float64(len(coin.Buy))
 
-							createReq = map[string]interface{}{
-								"category":    "spot",
-								"side":        "Sell",
-								"symbol":      coin.Name,
-								"orderType":   "Limit",
-								"qty":         fmt.Sprintf("%f", coin.Count),
-								"price":       fmt.Sprintf("%f", avg),
-								"timeInForce": "GTC",
+							createReq = models.CreateOrderRequest{
+								Category:    "spot",
+								Side:        "Sell",
+								Symbol:      coin.Name,
+								OrderType:   "Limit",
+								Qty:         fmt.Sprintf("%f", coin.Count),
+								Price:       fmt.Sprintf("%f", avg),
+								TimeInForce: "GTC",
 							}
 							jsonData, err = json.Marshal(createReq)
 							if err != nil {
@@ -336,6 +337,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							continue
 						} else {
 							fmt.Println(fmt.Sprintf("броо тут какая то хуйня : %s", getOrderResp.Result.List[0].Side))
+							continue
 						}
 
 						//switch getOrderResp.List[0].Side {
@@ -397,11 +399,11 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error updating coin", err)
 							}
 
-							// Canceling old buy order
-							cancelReq := map[string]interface{}{
-								"category": "spot",
-								"orderID":  coin.BuyOrderId,
-								"symbol":   coin.Name,
+							// Canceling old buy order.
+							cancelReq := models.CancelOrderRequest{
+								Category: "spot",
+								OrderId:  coin.BuyOrderId,
+								Symbol:   coin.Name,
 							}
 							jsonData, err := json.Marshal(cancelReq)
 							if err != nil {
@@ -413,20 +415,19 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error creating sign request", err)
 							}
 
-							// creating new buy order
+							// Creating new buy order.
 							z := "%." + strconv.Itoa(coiniks.QtyDecimals) + "f"
 							y := "%." + strconv.Itoa(coiniks.PriceDecimals) + "f"
-
-							createReq := map[string]interface{}{
-								"category":    "spot",
-								"side":        "Buy",
-								"symbol":      coin.Name,
-								"orderType":   "Limit",
-								"qty":         fmt.Sprintf(z, user.Balance*0.015/sellPrice),
-								"marketUint":  "baseCoin",
-								"positionIdx": 0,
-								"price":       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement),
-								"timeInForce": "GTC",
+							createReq := models.CreateOrderRequest{
+								Category:    "spot",
+								Side:        "Buy",
+								Symbol:      coin.Name,
+								OrderType:   "Limit",
+								Qty:         fmt.Sprintf(z, user.Balance*0.015/sellPrice),
+								MarketUint:  "baseCoin",
+								PositionIdx: 0,
+								Price:       fmt.Sprintf(y, coin.EntryPrice-coin.Decrement),
+								TimeInForce: "GTC",
 							}
 
 							jsonData, err = json.Marshal(createReq)

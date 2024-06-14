@@ -3,6 +3,7 @@ package stocks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"m1pes/internal/models"
@@ -96,8 +97,14 @@ func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate
 
 func (s *Service) GetBalanceFromBybit(apiKey, apiSecret string) (float64, error) {
 	resp := models.Response{}
-	params := "accountType=UNIFIED"
-	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(params, "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
+	params := map[string]interface{}{
+		"accountType": "UNIFIED",
+	}
+	jsonData, err := json.Marshal(params)
+	if err != nil {
+		fmt.Println(err)
+	}
+	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
 	if err != nil {
 		return 0, err
 	}

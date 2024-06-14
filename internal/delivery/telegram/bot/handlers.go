@@ -243,7 +243,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
 	}
 	if user.ApiKey == "" {
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет apyKey обратитесь к @n1fawin")
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "у тебя нет apiKey обратитесь к @n1fawin")
 		_, err = b.Send(msg)
 		if err != nil {
 			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)

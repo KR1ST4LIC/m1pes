@@ -27,4 +27,5 @@ type Coiniks struct {
 	QtyDecimals   int
 	PriceDecimals int
 	MinSumBuy     float64
+	Fee           float64
 }

@@ -47,9 +47,9 @@ func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
 		values = append(values, user.Percent)
 		i++
 	}
-	if user.Balance != 0 {
+	if user.USDTBalance != 0 {
 		setClauses = append(setClauses, fmt.Sprintf("bal = $%d", i))
-		values = append(values, user.Balance)
+		values = append(values, user.USDTBalance)
 		i++
 	}
 	if user.Capital != 0 {
@@ -85,7 +85,7 @@ func (r *Repository) GetAllUsers(ctx context.Context) ([]models.User, error) {
 	users := make([]models.User, 0)
 	for rows.Next() {
 		user := models.User{}
-		err = rows.Scan(&user.Id, &user.Balance, &user.Capital, &user.Percent, &user.Status, &user.TradingActivated)
+		err = rows.Scan(&user.Id, &user.USDTBalance, &user.Capital, &user.Percent, &user.Status, &user.TradingActivated)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +126,7 @@ func (r *Repository) NewUser(ctx context.Context, user models.User) error {
 func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
 	var user models.User
 	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status, api_key, secret_key FROM users WHERE tg_id=$1;", nil, userId)
-	err := res.Scan(&user.Balance, &user.Capital, &user.Percent, &user.Status, &user.ApiKey, &user.SecretKey)
+	err := res.Scan(&user.USDTBalance, &user.Capital, &user.Percent, &user.Status, &user.ApiKey, &user.SecretKey)
 	if err != nil {
 		return models.User{}, err
 	}

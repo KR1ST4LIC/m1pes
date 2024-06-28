@@ -2,7 +2,7 @@ package models
 
 type User struct {
 	Id               int64
-	Balance          float64
+	USDTBalance      float64
 	Capital          float64
 	Percent          float64
 	Income           float64
@@ -21,5 +21,5 @@ func (u User) UpdateUserId(userId int64) {
 }
 
 func (u User) UpdateBalance(newBalance float64) {
-	u.Balance = newBalance
+	u.USDTBalance = newBalance
 }

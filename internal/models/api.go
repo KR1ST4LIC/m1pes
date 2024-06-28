@@ -1,5 +1,7 @@
 package models
 
+// -----Get coin endpoint------
+
 type GetCoinRequest map[string]interface{}
 
 type GetCoinResponse struct {
@@ -13,6 +15,8 @@ type GetCoinResponse struct {
 		} `json:"list"`
 	} `json:"result"`
 }
+
+// -----Create order endpoint------
 
 type CreateOrderRequest struct {
 	Category    string `json:"category"`
@@ -38,6 +42,8 @@ type CreateOrderResponse struct {
 	TimeNow string `json:"timeNow"`
 }
 
+// -----Cancel order endpoint------
+
 type CancelOrderRequest struct {
 	Category string `json:"category"`
 	OrderId  string `json:"orderId"`
@@ -54,6 +60,8 @@ type CancelOrderResponse struct {
 	TimeNow string `json:"timeNow"`
 }
 
+// -----Get order endpoint------
+
 type GetOrderRequest map[string]interface{}
 
 type GetOrderResponse struct {
@@ -61,6 +69,7 @@ type GetOrderResponse struct {
 	RetMsg  string `json:"retMsg"`
 	Result  struct {
 		List []struct {
+			OrderID     string `json:"orderId"`
 			OrderStatus string `json:"orderStatus"`
 			Price       string `json:"price"`
 			Qty         string `json:"qty"`
@@ -68,6 +77,30 @@ type GetOrderResponse struct {
 		} `json:"list"`
 	} `json:"result"`
 }
+
+// -----Get user's wallet balance endpoint------
+
+type GetUserWalletRequest map[string]interface{}
+
+type GetUserWalletResponse struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	Result  struct {
+		List []struct {
+			//TotalWalletBalance    string `json:"totalWalletBalance"`
+			//TotalAvailableBalance string `json:"totalAvailableBalance"`
+			//TotalMarginBalance    string `json:"totalMarginBalance"`
+			TotalEquity string `json:"totalEquity"`
+			Coin        []struct {
+				Coin   string `json:"coin"`
+				Equity string `json:"equity"`
+				//SpotHedgingQty string `json:"spotHedgingQty"`
+			} `json:"coin"`
+		} `json:"list"`
+	} `json:"result"`
+}
+
+// -----Stupid coin endpoint------
 
 type OrderCreate struct {
 	Symbol string

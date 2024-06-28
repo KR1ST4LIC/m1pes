@@ -138,7 +138,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		h.actionChanMap[update.Message.Chat.ID] = make(chan models.Message)
 	}
 
-	// this goroutine waits for action from algorithm
+	// This goroutine waits for action from algorithm.
 	go func() {
 		for {
 			select {
@@ -269,7 +269,7 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
 	}
-	user.Balance = bal
+	user.USDTBalance = bal
 	err = h.us.UpdateUser(ctx, user)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in update user", err)
@@ -300,11 +300,11 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 
 	text += fmt.Sprintf("\nСумарный закуп: %.3f", userSum)
 
-	text += fmt.Sprintf("\nОбщий баланс: %.4f", user.Balance)
+	text += fmt.Sprintf("\nОбщий баланс: %.4f", user.USDTBalance)
 
-	text += fmt.Sprintf("\nЗаработал в процентах за последний день: %.3f", income/user.Balance*100) + "%"
+	text += fmt.Sprintf("\nЗаработал в процентах за последний день: %.3f", income/user.USDTBalance*100) + "%"
 
-	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.Balance*100) + "%"
+	text += fmt.Sprintf("\nИспользуется баланса: %.3f", userSum/user.USDTBalance*100) + "%"
 	fmt.Sprintf("%.%vf", 3, 3.0321023)
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)

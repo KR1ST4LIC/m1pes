@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) InitLogging() error {
-	handler := slog.Handler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true}))
+	handler := slog.Handler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true}))
 	handler = logging.NewSlogWrapper(handler)
 
 	logger := slog.New(handler)

@@ -81,10 +81,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					if err != nil {
 						slog.ErrorContext(ctx, "Error converting user USDT wallet balance to float", err)
 					}
-					//userCount, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].Coin[1].Equity, 64)
-					//if err != nil {
-					//	slog.ErrorContext(ctx, "Error converting user current coin wallet balance to float", err)
-					//}
 
 					user.USDTBalance = userUSDTBalance
 
@@ -217,6 +213,9 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 
 							updateCoin := models.NewCoin(user.Id, coin.Name)
+							if createOrderResp.Result.OrderID == "" {
+								continue
+							}
 							updateCoin.BuyOrderId = createOrderResp.Result.OrderID
 
 							err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
@@ -245,17 +244,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							}
 							avg := sum / float64(len(coin.Buy))
 
-							// Checking if count is more than equity in the balance.
-							//eq, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].Coin[1].Equity, 64)
-							//if err != nil {
-							//	slog.ErrorContext(ctx, "Error parsing equity to float", err)
-							//}
-							//
-							//if coin.Count > eq {
-							//	fmt.Println("HEREREREREREERHEHEHHEH", coin.Count, eq)
-							//	coin.Count = eq
-							//}
-
 							createReq = models.CreateOrderRequest{
 								Category:    "spot",
 								Side:        "Sell",
@@ -269,15 +257,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							createOrderResp, err = s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 							if err != nil {
 								slog.ErrorContext(ctx, "Error creating order", err)
-								//if errors.Is(err, errors.New("create order failed: Insufficient balance.")) {
-								//	fmt.Println("here")
-								//	createReq.Qty = getUserWalletResp.Result.List[0].Coin[1].Equity
-								//
-								//	createOrderResp, err = s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
-								//	if err != nil {
-								//		slog.ErrorContext(ctx, "Error creating order", err)
-								//	}
-								//}
 							}
 
 							updateCoin = models.NewCoin(user.Id, coin.Name)

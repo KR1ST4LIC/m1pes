@@ -310,6 +310,17 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							if err != nil {
 								slog.ErrorContext(ctx, "Error canceling order", err)
 							}
+							updateCoin := models.NewCoin(userId, coin.Name)
+							updateCoin.EntryPrice = sellPrice
+							err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+							if err != nil {
+								slog.ErrorContext(ctx, "Error updating coin", err)
+							}
+							resetedCoin, err := s.sStorageRepo.GetCoin(ctx, userId, coin.Name)
+							if err != nil {
+								slog.ErrorContext(ctx, "Error getting reseted coin", err)
+								return
+							}
 
 							// Creating new buy order.
 							createReq := models.CreateOrderRequest{
@@ -320,7 +331,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/sellPrice),
 								MarketUint:  "baseCoin",
 								PositionIdx: 0,
-								Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-coin.Decrement),
+								Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", resetedCoin.EntryPrice-resetedCoin.Decrement),
 								TimeInForce: "GTC",
 							}
 
@@ -329,7 +340,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								slog.ErrorContext(ctx, "Error creating order", err)
 							}
 
-							updateCoin := models.NewCoin(user.Id, coin.Name)
+							updateCoin = models.NewCoin(user.Id, coin.Name)
 							updateCoin.BuyOrderId = createOrderResp.Result.OrderID
 							updateCoin.SellOrderId = "setNull"
 

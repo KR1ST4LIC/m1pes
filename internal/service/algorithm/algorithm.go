@@ -145,7 +145,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 							Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/currentPrice),
 							MarketUint:  "baseCoin",
 							PositionIdx: 0,
-							Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-coin.Decrement),
+							Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-resetedCoin.Decrement),
 							TimeInForce: "GTC",
 						}
 
@@ -178,16 +178,14 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus {
 						if getOrderResp.Result.List[0].Side == "Buy" {
 							slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
-
-							price, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-coin.Decrement), 64)
-							if err != nil {
-								fmt.Println(err)
-							}
+							price, _ := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
 
 							coin.Buy = append(coin.Buy, price)
 
 							count, _ := strconv.ParseFloat(getOrderResp.Result.List[0].Qty, 64)
-							coin.Count += count - (count * coiniks.Fee)
+
+							fee, _ := strconv.ParseFloat(getOrderResp.Result.List[0].CumExecFee, 64)
+							coin.Count += count - fee
 
 							slog.DebugContext(ctx, fmt.Sprintf("count: %f; price: %f", count, price))
 
@@ -250,7 +248,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 								Symbol:      coin.Name,
 								OrderType:   "Limit",
 								Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", coin.Count),
-								Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", avg),
+								Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", avg*(1+user.Percent)),
 								TimeInForce: "GTC",
 							}
 

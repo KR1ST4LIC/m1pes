@@ -433,31 +433,33 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		return err
 	}
 
-	var money float64
-	for i := 0; i < len(coin.Buy); i++ {
-		money += coin.Buy[i]
-	}
-	avg := money / float64(len(coin.Buy))
-	spentMoney := avg * coin.Count
-	earnMoney := currentPrice * coin.Count
+	if len(coin.Buy) > 0 {
+		var money float64
+		for i := 0; i < len(coin.Buy); i++ {
+			money += coin.Buy[i]
+		}
+		avg := money / float64(len(coin.Buy))
+		spentMoney := avg * coin.Count
+		earnMoney := currentPrice * coin.Count
 
-	income := earnMoney - spentMoney
+		income := earnMoney - spentMoney
+
+		err = s.uStorageRepo.ChangeBalance(ctx, userId, income)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error change balance", err)
+			return err
+		}
+
+		err = s.sStorageRepo.InsertIncome(userId, coinTag, income, coin.Count)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error insert income", err)
+			return err
+		}
+	}
 
 	err = s.sStorageRepo.DeleteCoin(ctx, userId, coinTag)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error delete coin", err)
-		return err
-	}
-
-	err = s.uStorageRepo.ChangeBalance(ctx, userId, income)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error change balance", err)
-		return err
-	}
-
-	err = s.sStorageRepo.InsertIncome(userId, coinTag, income, coin.Count)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error insert income", err)
 		return err
 	}
 

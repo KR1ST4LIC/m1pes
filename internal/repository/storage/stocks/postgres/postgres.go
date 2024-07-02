@@ -54,8 +54,8 @@ func (r *Repository) GetCoin(ctx context.Context, userId int64, coinName string)
 
 func (r *Repository) GetCoiniks(ctx context.Context, coinName string) (models.Coiniks, error) {
 	var coiniks models.Coiniks
-	rows := r.Conn.QueryRowEx(ctx, "SELECT qty_decimals, price_decimals, min_sum_buy, fee FROM coiniks WHERE coin_name=$1;", nil, coinName)
-	err := rows.Scan(&coiniks.QtyDecimals, &coiniks.PriceDecimals, &coiniks.MinSumBuy, &coiniks.Fee)
+	rows := r.Conn.QueryRowEx(ctx, "SELECT qty_decimals, price_decimals, min_sum_buy FROM coiniks WHERE coin_name=$1;", nil, coinName)
+	err := rows.Scan(&coiniks.QtyDecimals, &coiniks.PriceDecimals, &coiniks.MinSumBuy)
 	if err != nil {
 		return coiniks, err
 	}

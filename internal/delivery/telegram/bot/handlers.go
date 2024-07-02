@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"m1pes/internal/algorithm"
-
 	"m1pes/internal/logging"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -51,6 +49,13 @@ type Handler struct {
 	actionChanMap map[int64]chan models.Message
 }
 
+const (
+	SellAction = "sell"
+	BuyAction  = "buy"
+
+	ReportErrorChatId = -4216803774
+)
+
 func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAPI) *Handler {
 	ctx := context.Background()
 
@@ -69,27 +74,41 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 				h.actionChanMap[user.Id] = make(chan models.Message)
 			}
 
-			// this goroutine waits for action from algorithm
+			// This goroutine waits for action from algorithm.
 			go func() {
 				funcUser := user
 				for {
 					select {
 					case msg := <-h.actionChanMap[funcUser.Id]:
 						var text string
+						var chatId int64
+
 						switch msg.Action {
-						case algorithm.SellAction:
-							err = h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
+						case SellAction:
+							err := h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
 							if err != nil {
 								slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
 							}
+
 							err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
+							if err != nil {
+								slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
+							}
+
 							def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
+
 							text = "ПРОДАЖА\n" + def
-						case algorithm.BuyAction:
+							chatId = msg.User.Id
+						case BuyAction:
 							def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
+
 							text = "ПОКУПКА\n" + def
+							chatId = msg.User.Id
+						default:
+							text = msg.Action
+							chatId = ReportErrorChatId
 						}
-						botMsg := tgbotapi.NewMessage(msg.User.Id, text)
+						botMsg := tgbotapi.NewMessage(chatId, text)
 						_, err = b.Send(botMsg)
 						if err != nil {
 							slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
@@ -105,7 +124,7 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 			msg := tgbotapi.NewMessage(user.Id, "Ты начал торговлю, бот пришлет сообщение если купит или продаст монеты!")
 			_, err = b.Send(msg)
 			if err != nil {
-				log.Println(err)
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 			}
 		}
 	}
@@ -134,6 +153,25 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.From.ID)
 
+	// Check if trading already has been started.
+	user, err := h.us.GetUser(ctx, update.Message.From.ID)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
+	}
+
+	fmt.Println(user)
+
+	if user.TradingActivated {
+		botMsg := tgbotapi.NewMessage(update.Message.From.ID, "Вы уже начали торговлю!)")
+		_, err := b.Send(botMsg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
+
+		return
+	}
+	// Check over.
+
 	if _, ok := h.actionChanMap[update.Message.Chat.ID]; !ok {
 		h.actionChanMap[update.Message.Chat.ID] = make(chan models.Message)
 	}
@@ -144,20 +182,34 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 			select {
 			case msg := <-h.actionChanMap[update.Message.From.ID]:
 				var text string
+				var chatId int64
+
 				switch msg.Action {
-				case algorithm.SellAction:
+				case SellAction:
 					err := h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
 					if err != nil {
 						slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
 					}
+
 					err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
+					if err != nil {
+						slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
+					}
+
 					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
+
 					text = "ПРОДАЖА\n" + def
-				case algorithm.BuyAction:
+					chatId = msg.User.Id
+				case BuyAction:
 					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
+
 					text = "ПОКУПКА\n" + def
+					chatId = msg.User.Id
+				default:
+					text = msg.Action
+					chatId = ReportErrorChatId
 				}
-				botMsg := tgbotapi.NewMessage(msg.User.Id, text)
+				botMsg := tgbotapi.NewMessage(chatId, text)
 				_, err := b.Send(botMsg)
 				if err != nil {
 					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
@@ -166,7 +218,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		}
 	}()
 
-	err := h.as.StartTrading(ctx, update.Message.From.ID, h.actionChanMap)
+	err = h.as.StartTrading(ctx, update.Message.From.ID, h.actionChanMap)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
 	}

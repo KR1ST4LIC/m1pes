@@ -37,6 +37,5 @@ CREATE TABLE IF NOT EXISTS coiniks
     "coin_name" text,
     "qty_decimals" int default 0,
     "price_decimals" int default 0,
-    "min_sum_buy"  double precision default 0,
-    "fee" double precision default 0
+    "min_sum_buy"  double precision default 0
 );

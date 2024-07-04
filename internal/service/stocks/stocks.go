@@ -69,6 +69,14 @@ func (s *Service) InsertIncome(userID int64, coinTag string, income, count float
 	return nil
 }
 
+func (s *Service) GetCoiniks(ctx context.Context, coinTag string) (models.Coiniks, error) {
+	u, err := s.storageRepo.GetCoiniks(ctx, coinTag)
+	if err != nil {
+		return u, err
+	}
+	return u, nil
+}
+
 func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error) {
 	resp := models.CreateOrderResponse{}
 	postParams := map[string]interface{}{

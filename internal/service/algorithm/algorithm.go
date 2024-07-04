@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
+
 	"m1pes/internal/delivery/telegram/bot"
 	"m1pes/internal/models"
-	"strconv"
 
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"

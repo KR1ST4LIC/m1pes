@@ -17,7 +17,7 @@ import (
 
 type (
 	StockService interface {
-		GetCoin(ctx context.Context, userId int64, coin string)
+		GetCoin(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error)
 		GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error)
 		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 		AddCoin(coin models.Coin) error
@@ -498,41 +498,57 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 		}
 		return
 	}
-
-	coiniks, err := h.ss.GetCoiniks(ctx, update.Message.Text)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error getting coiniks", err)
-		return
-	}
-
-	balance, err := h.ss.GetBalanceFromBybit(user.ApiKey, user.SecretKey)
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
-	}
-
-	if balance < coiniks.MinSumBuy*75 {
-		user := models.NewUser(update.Message.From.ID)
-		user.Status = "none"
-
-		err = h.us.UpdateUser(ctx, user)
-		if err != nil {
-			log.Println(err)
-		}
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("На этой монете есть ограничение для минимального баланса на аккаунте - %.4f$ , попробуйте еще раз после пополнения баланса /addCoin", coiniks.MinSumBuy*75))
-		_, err = b.Send(msg)
-		if err != nil {
-			log.Println(err)
-		}
-		return
-	}
-	if err != nil {
-		log.Println(err)
-	}
 	can, err := h.ss.ExistCoin(ctx, update.Message.Text)
 	if err != nil {
 		log.Println(err)
 	}
 	if can {
+		coiniks, err := h.ss.GetCoiniks(ctx, update.Message.Text)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error getting coiniks", err)
+			return
+		}
+
+		balance, err := h.ss.GetBalanceFromBybit(user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
+		}
+
+		getCoinReqParams := make(models.GetCoinRequest)
+		getCoinReqParams["category"] = "spot"
+		getCoinReqParams["symbol"] = update.Message.Text
+
+		getCoinResp, err := h.ss.GetCoin(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
+			return
+		}
+
+		currentPrice, err := strconv.ParseFloat(getCoinResp.Result.List[0].Price, 64)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error parsing current price to float", err)
+			return
+		}
+
+		if balance*0.015/currentPrice < coiniks.MinSumBuy*1.1 {
+			user := models.NewUser(update.Message.From.ID)
+			user.Status = "none"
+
+			err = h.us.UpdateUser(ctx, user)
+			if err != nil {
+				log.Println(err)
+			}
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("На этой монете есть ограничение для минимального баланса на аккаунте - %.4f$ , попробуйте еще раз после пополнения баланса /addCoin", coiniks.MinSumBuy*1.1*currentPrice*67.0))
+			_, err = b.Send(msg)
+			if err != nil {
+				log.Println(err)
+			}
+			return
+		}
+		if err != nil {
+			log.Println(err)
+		}
+
 		coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}
 		err = h.ss.AddCoin(coin)
 		if err != nil {
@@ -547,7 +563,7 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 		}
 
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Монета успешно добавленна")
-		_, err := b.Send(msg)
+		_, err = b.Send(msg)
 		if err != nil {
 			log.Println(err)
 		}

@@ -3,11 +3,14 @@ package algorithm
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
-	"m1pes/internal/delivery/telegram/bot"
-	"m1pes/internal/models"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"m1pes/internal/delivery/telegram/bot"
+	"m1pes/internal/models"
 
 	apiStock "m1pes/internal/repository/api/stocks"
 	storageStock "m1pes/internal/repository/storage/stocks"
@@ -60,9 +63,13 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					delete(s.stopCoinMap[userId], coin.Name)
 					return
 				default:
-					err = s.HandleCoinUpdate(ctx, coin, userId, actionChanMap)
+					err, eris := s.HandleCoinUpdate(ctx, coin, userId, actionChanMap)
 					if err != nil {
-						actionChanMap[userId] <- models.Message{Action: err.Error()}
+						actionChanMap[userId] <- models.Message{
+							Action: err.Error(),
+							File:   eris.File,
+							Line:   eris.Line,
+						}
 					}
 				}
 			}
@@ -238,19 +245,21 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 
 // These functions are do not need for implementing AlgorithmService.
 
-func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) error {
-	// Getting user from storage.
+func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) (error, models.Error) {
+	eris := models.Error{}
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// Getting coin from storage.
 	coin, err = s.sStorageRepo.GetCoin(ctx, user.Id, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from storage", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// Getting user's wallet balance from api.
@@ -260,13 +269,15 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getUserWalletResp, err := s.apiRepo.GetUserWalletBalance(ctx, getUserWalletParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user wallet balance", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	userUSDTBalance, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].TotalEquity, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error converting user USDT wallet balance to float", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	user.USDTBalance = userUSDTBalance
@@ -279,20 +290,23 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getCoinResp, err := s.apiRepo.GetCoin(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	currentPrice, err := strconv.ParseFloat(getCoinResp.Result.List[0].Price, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing current price to float", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// Getting coiniks from storage.
 	coiniks, err := s.sStorageRepo.GetCoiniks(ctx, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coiniks", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice.
@@ -302,9 +316,10 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleRaisingEntryPrice(ctx, currentPrice, coin, user, coiniks)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling entry price", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
-		return nil
+		return nil, eris
 	}
 
 	// Checking if BUY ORDER has been fulfilled.
@@ -316,7 +331,8 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// If that buy order has no errors and order status is filled.
@@ -326,9 +342,10 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling filled buy order", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
-		return nil
+		return nil, eris
 	}
 
 	// Checking if SELL ORDER has been fulfilled.
@@ -340,7 +357,8 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getOrderResp, err = s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// If that sell order has no errors and order status is filled.
@@ -350,10 +368,11 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleFilledSellOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling filled sell order", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
 	}
-	return nil
+	return nil, eris
 }
 
 func (s *Service) HandleRaisingEntryPrice(ctx context.Context, currentPrice float64, coin models.Coin, user models.User, coiniks models.Coiniks) error {
@@ -644,4 +663,11 @@ func (s *Service) HandleFilledSellOrder(ctx context.Context, getOrderResp models
 	actionChanMap[user.Id] <- msg
 
 	return nil
+}
+
+func loadError(err error) (file string, line int) {
+	_, file, line, _ = runtime.Caller(1)
+	log.Printf("error: %v", err)
+	return file, line
+
 }

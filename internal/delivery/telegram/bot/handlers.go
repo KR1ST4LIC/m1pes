@@ -108,7 +108,7 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 							text = "ПОКУПКА\n" + def
 							chatId = msg.User.Id
 						default:
-							text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
+							text = msg.Action
 							chatId = ReportErrorChatId
 						}
 						botMsg := tgbotapi.NewMessage(chatId, text)
@@ -554,7 +554,7 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 			return
 		}
 
-		balance, err := h.ss.GetBalanceFromBybit(user.ApiKey, user.SecretKey)
+		balance, err := h.ss.GetUserWalletBalance(ctx, user.ApiKey, user.SecretKey)
 		if err != nil {
 			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Get Balance Frim Bybit", err)
 		}

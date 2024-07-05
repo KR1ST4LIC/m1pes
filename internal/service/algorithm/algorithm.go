@@ -3,7 +3,9 @@ package algorithm
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
+	"runtime"
 	"strconv"
 
 	"m1pes/internal/delivery/telegram/bot"
@@ -58,9 +60,14 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					delete(s.stopCoinMap[userId], coin.Name)
 					return
 				default:
-					err = s.HandleService(ctx, coin, userId, actionChanMap)
+					err, eris := s.HandleService(ctx, coin, userId, actionChanMap)
 					if err != nil {
-						actionChanMap[userId] <- models.Message{Action: err.Error()}
+						actionChanMap[userId] <- models.Message{
+							Action: err.Error(),
+							File:   eris.File,
+							Line:   eris.Line,
+						}
+
 					}
 				}
 			}
@@ -79,17 +86,20 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 	return nil
 }
 
-func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) error {
+func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) (error, models.Error) {
+	eris := models.Error{}
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	coin, err = s.sStorageRepo.GetCoin(ctx, user.Id, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from storage", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	getUserWalletParams := make(models.GetUserWalletRequest)
@@ -99,13 +109,15 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 	getUserWalletResp, err := s.apiRepo.GetUserWalletBalance(ctx, getUserWalletParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user wallet balance", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	userUSDTBalance, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].Coin[0].Equity, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error converting user USDT wallet balance to float", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	user.USDTBalance = userUSDTBalance
@@ -117,19 +129,22 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 	getCoinResp, err := s.apiRepo.GetCoin(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	currentPrice, err := strconv.ParseFloat(getCoinResp.Result.List[0].Price, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing current price to float", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	coiniks, err := s.sStorageRepo.GetCoiniks(ctx, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coiniks", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice.
@@ -141,13 +156,15 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 		err = s.sStorageRepo.ResetCoin(ctx, coin, user)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error update coin", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
 
 		resetedCoin, err := s.sStorageRepo.GetCoin(ctx, userId, coin.Name)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error getting reseted coin", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
 
 		// Canceling buy order.
@@ -161,7 +178,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error canceling order", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 		}
 
@@ -181,7 +199,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 		createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error creating order", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
 
 		updateCoin := models.NewCoin(user.Id, coin.Name)
@@ -190,9 +209,10 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 		err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error updating coin", err)
-			return err
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
-		return nil
+		return nil, eris
 	}
 
 	// Checking if BUY ORDER has been fulfilled.
@@ -204,7 +224,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 	getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus {
@@ -214,7 +235,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			price, err := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error parsing price to float", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			coin.Buy = append(coin.Buy, price)
@@ -222,13 +244,15 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			count, err := strconv.ParseFloat(getOrderResp.Result.List[0].Qty, 64)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error parsing count to float", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			fee, err := strconv.ParseFloat(getOrderResp.Result.List[0].CumExecFee, 64)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error parsing fee to float", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			coin.Count += count - fee
@@ -236,7 +260,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			err = s.sStorageRepo.UpdateCoin(ctx, coin)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Creating new buy order.
@@ -253,19 +278,18 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error creating order", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			updateCoin := models.NewCoin(user.Id, coin.Name)
-			if createOrderResp.Result.OrderID == "" {
-				return nil
-			}
 			updateCoin.BuyOrderId = createOrderResp.Result.OrderID
 
 			err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Canceling old sell order, if it exists.
@@ -279,7 +303,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 				_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
 				if err != nil {
 					slog.ErrorContext(ctx, "Error canceling order", err)
-					return err
+					eris.File, eris.Line = loadError(err)
+					return err, eris
 				}
 			}
 
@@ -303,7 +328,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			createOrderResp, err = s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error creating order", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			updateCoin = models.NewCoin(user.Id, coin.Name)
@@ -312,7 +338,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Sending message for goroutine from handler to notify user about buy
@@ -324,7 +351,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 
 			actionChanMap[user.Id] <- msg
 
-			return nil
+			eris.File, eris.Line = loadError(err)
+			return err, eris
 		}
 	}
 
@@ -337,7 +365,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 	getOrderResp, err = s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		return err
+		eris.File, eris.Line = loadError(err)
+		return err, eris
 	}
 
 	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus {
@@ -347,13 +376,15 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			sellPrice, err := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error parsing price to float", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			err = s.sStorageRepo.SellCoin(user.Id, coin.Name, sellPrice)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Canceling old buy order.
@@ -374,13 +405,15 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			resetedCoin, err := s.sStorageRepo.GetCoin(ctx, userId, coin.Name)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error getting reseted coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Creating new buy order.
@@ -399,7 +432,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error creating order", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			updateCoin = models.NewCoin(user.Id, coin.Name)
@@ -409,7 +443,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error updating coin", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			// Sending message for goroutine from handler to notify user about sell
@@ -431,7 +466,8 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 			err = s.sStorageRepo.InsertIncome(user.Id, coin.Name, income, coin.Count)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error inserting income", err)
-				return err
+				eris.File, eris.Line = loadError(err)
+				return err, eris
 			}
 
 			coin.Count = 0
@@ -443,7 +479,7 @@ func (s *Service) HandleService(ctx context.Context, coin models.Coin, userId in
 		}
 	}
 
-	return nil
+	return nil, eris
 }
 
 func (s *Service) StopTrading(ctx context.Context, userID int64) error {
@@ -515,4 +551,11 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 	}
 
 	return nil
+}
+
+func loadError(err error) (file string, line int) {
+	_, file, line, _ = runtime.Caller(1)
+	log.Printf("error: %v", err)
+	return file, line
+
 }

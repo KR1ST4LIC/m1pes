@@ -106,7 +106,7 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 							text = "ПОКУПКА\n" + def
 							chatId = msg.User.Id
 						default:
-							text = msg.Action
+							text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
 							chatId = ReportErrorChatId
 						}
 						botMsg := tgbotapi.NewMessage(chatId, text)
@@ -207,7 +207,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 					text = "ПОКУПКА\n" + def
 					chatId = msg.User.Id
 				default:
-					text = msg.Action
+					text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
 					chatId = ReportErrorChatId
 				}
 				botMsg := tgbotapi.NewMessage(chatId, text)

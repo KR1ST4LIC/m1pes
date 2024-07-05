@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log/slog"
 	"m1pes/internal/models"
 	"net/http"
 	"strconv"
@@ -20,8 +18,7 @@ import (
 )
 
 const (
-	priceURL = "https://api.bybit.com/v2/public/tickers?symbol="
-	URL      = "https://api.bybit.com"
+	URL = "https://api.bybit.com"
 
 	CreateOrderEndpoint   = "/v5/order/create"
 	CancelOrderEndpoint   = "/v5/order/cancel"
@@ -164,49 +161,6 @@ func (r *Repository) GetOrder(ctx context.Context, orderReq models.GetOrderReque
 	}
 
 	return getOrderResp, nil
-}
-
-func (r *Repository) GetPrice(ctx context.Context, coinTag, apiKey string) (float64, error) {
-	url := priceURL + coinTag
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error creating request:", err)
-		return 0, err
-	}
-
-	req.Header.Set("X-BAPI-API-KEY", apiKey)
-	resp, err := r.cli.Do(req)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error sending request:", err)
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error reading response body:", err)
-		return 0, err
-	}
-
-	var data map[string]interface{}
-
-	if err = json.Unmarshal(body, &data); err != nil {
-		slog.ErrorContext(ctx, "error in unmarshal:", err)
-		return 0, err
-	}
-
-	result := data["result"].([]interface{})
-	if len(result) == 0 {
-		slog.ErrorContext(ctx, "empty result")
-		return 0, nil
-	}
-
-	bidPrice := result[0].(map[string]interface{})["bid_price"].(string)
-
-	price, _ := strconv.ParseFloat(bidPrice, 64)
-
-	return price, nil
 }
 
 func (r *Repository) CreateSignRequestAndGetRespBody(params, endPoint, method, apiKey, apiSecret string) ([]byte, error) {

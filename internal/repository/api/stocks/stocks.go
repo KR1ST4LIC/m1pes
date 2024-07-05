@@ -10,7 +10,6 @@ type Repository interface {
 	CancelOrder(ctx context.Context, orderReq models.CancelOrderRequest, apiKey, secretKey string) (models.CancelOrderResponse, error)
 	GetOrder(ctx context.Context, orderReq models.GetOrderRequest, apiKey, secretKey string) (models.GetOrderResponse, error)
 	GetCoin(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error)
-	GetPrice(ctx context.Context, coinTag, apiKey string) (float64, error)
 	GetUserWalletBalance(ctx context.Context, req models.GetUserWalletRequest, apiKey, secretKey string) (models.GetUserWalletResponse, error)
 	CreateSignRequestAndGetRespBody(params, endPoint, method, apiKey, apiSecret string) ([]byte, error)
 }

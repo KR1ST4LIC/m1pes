@@ -3,7 +3,7 @@ package stocks
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"strconv"
 
 	"m1pes/internal/models"
@@ -107,30 +107,21 @@ func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate
 	return resp.Result.OrderID, nil
 }
 
-func (s *Service) GetBalanceFromBybit(apiKey, apiSecret string) (float64, error) {
-	resp := models.Response{}
-	params := map[string]interface{}{
-		"accountType": "UNIFIED",
-	}
-	jsonData, err := json.Marshal(params)
+func (s *Service) GetUserWalletBalance(ctx context.Context, apiKey, apiSecret string) (float64, error) {
+	getUserWalletParams := make(models.GetUserWalletRequest)
+	getUserWalletParams["accountType"] = "UNIFIED"
+
+	getUserWalletResp, err := s.apiRepo.GetUserWalletBalance(ctx, getUserWalletParams, apiKey, apiSecret)
 	if err != nil {
-		fmt.Println(err)
-	}
-	data, err := s.apiRepo.CreateSignRequestAndGetRespBody(string(jsonData), "/v5/account/wallet-balance", "GET", apiKey, apiSecret)
-	if err != nil {
+		slog.ErrorContext(ctx, "Error converting user USDT wallet balance to float", err)
 		return 0, err
 	}
-	json.Unmarshal(data, &resp)
-	if resp.RetMsg == "OK" {
-		if resp.Result.List[0].TotalEquity == "" {
-			return 0, nil
-		}
-	} else {
-		return 0, err
-	}
-	a, err := strconv.ParseFloat(resp.Result.List[0].TotalEquity, 64)
+
+	userUSDTBalance, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].TotalEquity, 64)
 	if err != nil {
+		slog.ErrorContext(ctx, "Error getting user wallet balance", err)
 		return 0, err
 	}
-	return a, nil
+
+	return userUSDTBalance, nil
 }

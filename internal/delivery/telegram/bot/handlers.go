@@ -6,7 +6,6 @@ import (
 	"log"
 	"log/slog"
 	"strconv"
-	"strings"
 
 	"m1pes/internal/logging"
 
@@ -411,85 +410,6 @@ func (h *Handler) GetCoinList(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	}
 }
 
-func (h *Handler) ReplenishBalance(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
-
-	err := h.us.ReplenishBalance(ctx, update.Message.Chat.ID, ctx.Value("replenishAmount").(float64))
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
-	}
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "баланс успешно добавлен")
-	_, err = b.Send(msg)
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-	}
-}
-
-func (h *Handler) UpdatePercentCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
-
-	user := models.NewUser(update.Message.From.ID)
-	user.Status = "updatePercent"
-
-	err := h.us.UpdateUser(ctx, user)
-	if err != nil {
-		log.Println(err)
-	}
-
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "На скольки процентах вы хотите торговать?")
-	_, err = b.Send(msg)
-	if err != nil {
-		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-	}
-}
-
-func (h *Handler) UpdatePercent(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
-	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
-
-	text := strings.Replace(update.Message.Text, ",", ".", -1)
-	percent, err := strconv.ParseFloat(text, 64)
-	if err != nil {
-		log.Println(err)
-	}
-	if percent >= 0.25 && percent <= 20 {
-		user := models.NewUser(update.Message.From.ID)
-		user.Percent = percent * 0.01
-
-		err = h.us.UpdateUser(ctx, user)
-		if err != nil {
-			log.Println(err)
-		}
-
-		user = models.NewUser(update.Message.From.ID)
-		user.Status = "none"
-
-		err = h.us.UpdateUser(ctx, user)
-		if err != nil {
-			log.Println(err)
-		}
-
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Процент торговли успешно изменен")
-		_, err := b.Send(msg)
-		if err != nil {
-			log.Println(err)
-		}
-	} else {
-		user := models.NewUser(update.Message.From.ID)
-		user.Status = "none"
-
-		err = h.us.UpdateUser(ctx, user)
-		if err != nil {
-			log.Println(err)
-		}
-
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неправильно введены проценты. Максимальное значение процентов - 20, а минимальное - 0.25 попробуйте ещё раз - /percent")
-		_, err := b.Send(msg)
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
-
 func (h *Handler) AddCoinCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
 
@@ -638,8 +558,6 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 	}
 
 	switch user.Status {
-	case "updatePercent":
-		h.UpdatePercentCmd(ctx, b, update)
 	case "addCoin":
 		h.AddCoin(ctx, b, update)
 	case "deleteCoin":

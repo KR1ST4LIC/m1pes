@@ -3,7 +3,6 @@ package algorithm
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"runtime"
 	"strconv"
@@ -250,7 +249,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -258,7 +257,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	coin, err = s.sStorageRepo.GetCoin(ctx, user.Id, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from storage", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -269,14 +268,14 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getUserWalletResp, err := s.apiRepo.GetUserWalletBalance(ctx, getUserWalletParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user wallet balance", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
 	userUSDTBalance, err := strconv.ParseFloat(getUserWalletResp.Result.List[0].TotalEquity, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error converting user USDT wallet balance to float", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -290,14 +289,14 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getCoinResp, err := s.apiRepo.GetCoin(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
 	currentPrice, err := strconv.ParseFloat(getCoinResp.Result.List[0].Price, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing current price to float", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -305,7 +304,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	coiniks, err := s.sStorageRepo.GetCoiniks(ctx, coin.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coiniks", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -316,7 +315,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleRaisingEntryPrice(ctx, currentPrice, coin, user, coiniks)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling entry price", err)
-			eris.File, eris.Line = loadError(err)
+			_, eris.File, eris.Line, _ = runtime.Caller(0)
 			return err, eris
 		}
 		return nil, eris
@@ -331,7 +330,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -342,7 +341,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling filled buy order", err)
-			eris.File, eris.Line = loadError(err)
+			_, eris.File, eris.Line, _ = runtime.Caller(0)
 			return err, eris
 		}
 		return nil, eris
@@ -357,7 +356,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	getOrderResp, err = s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
-		eris.File, eris.Line = loadError(err)
+		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
 
@@ -368,7 +367,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		err = s.HandleFilledSellOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling filled sell order", err)
-			eris.File, eris.Line = loadError(err)
+			_, eris.File, eris.Line, _ = runtime.Caller(0)
 			return err, eris
 		}
 	}
@@ -663,11 +662,4 @@ func (s *Service) HandleFilledSellOrder(ctx context.Context, getOrderResp models
 	actionChanMap[user.Id] <- msg
 
 	return nil
-}
-
-func loadError(err error) (file string, line int) {
-	_, file, line, _ = runtime.Caller(1)
-	log.Printf("error: %v", err)
-	return file, line
-
 }

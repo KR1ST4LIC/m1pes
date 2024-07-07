@@ -210,8 +210,6 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		//	return err
 		//}
 
-		fmt.Println("CURRRENENEENT: ", currentPrice)
-
 		var money float64
 		for i := 0; i < len(coin.Buy); i++ {
 			money += coin.Buy[i]

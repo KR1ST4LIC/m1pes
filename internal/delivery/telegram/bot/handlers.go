@@ -33,7 +33,6 @@ type (
 		GetAllUsers(ctx context.Context) ([]models.User, error)
 		NewUser(ctx context.Context, user models.User) error
 		GetUser(ctx context.Context, userId int64) (models.User, error)
-		ReplenishBalance(ctx context.Context, userId int64, amount float64) error
 		GetIncomeLastDay(ctx context.Context, userID int64) (float64, error)
 	}
 
@@ -87,16 +86,6 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 
 						switch msg.Action {
 						case SellAction:
-							err := h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
-							if err != nil {
-								slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
-							}
-
-							err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
-							if err != nil {
-								slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
-							}
-
 							def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
 
 							text = "ПРОДАЖА\n" + def
@@ -190,16 +179,6 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 
 				switch msg.Action {
 				case SellAction:
-					err := h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
-					if err != nil {
-						slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
-					}
-
-					err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
-					if err != nil {
-						slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
-					}
-
 					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
 
 					text = "ПРОДАЖА\n" + def

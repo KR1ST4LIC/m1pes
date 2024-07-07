@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"m1pes/internal/logging"
 
@@ -83,15 +84,24 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 					case msg := <-h.actionChanMap[funcUser.Id]:
 						var text string
 						var chatId int64
-
+						coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
+						if err != nil {
+							msg.Action = err.Error()
+						}
 						switch msg.Action {
 						case SellAction:
-							def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
+							a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
+							d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
+							c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
+
+							def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
 
 							text = "ПРОДАЖА\n" + def
 							chatId = msg.User.Id
 						case BuyAction:
-							def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
+							a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
+							d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
+							def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
 
 							text = "ПОКУПКА\n" + def
 							chatId = msg.User.Id
@@ -177,14 +187,25 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 				var text string
 				var chatId int64
 
+				coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
+				if err != nil {
+					msg.Action = err.Error()
+				}
+
 				switch msg.Action {
 				case SellAction:
-					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
+					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
+					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
+					c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
+
+					def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
 
 					text = "ПРОДАЖА\n" + def
 					chatId = msg.User.Id
 				case BuyAction:
-					def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
+					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
+					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
+					def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
 
 					text = "ПОКУПКА\n" + def
 					chatId = msg.User.Id
@@ -193,7 +214,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 					chatId = ReportErrorChatId
 				}
 				botMsg := tgbotapi.NewMessage(chatId, text)
-				_, err := b.Send(botMsg)
+				_, err = b.Send(botMsg)
 				if err != nil {
 					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 				}
@@ -548,4 +569,23 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 			log.Println(err)
 		}
 	}
+}
+
+func trimTrailingZeros(numStr string) string {
+	f, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		fmt.Println("Ошибка:", err)
+		return numStr
+	}
+	// Преобразуем число обратно в строку
+	trimmedStr := strconv.FormatFloat(f, 'f', -1, 64)
+
+	// Если строка содержит точку, удалим все нули, стоящие в конце
+	if strings.Contains(trimmedStr, ".") {
+		trimmedStr = strings.TrimRight(trimmedStr, "0")
+		// Если точка осталась в конце строки, удалим её тоже
+		trimmedStr = strings.TrimRight(trimmedStr, ".")
+	}
+
+	return trimmedStr
 }

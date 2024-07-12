@@ -16,14 +16,6 @@ func New(userRepo user.Repository) *Service {
 	return &Service{userRepo: userRepo}
 }
 
-func (s *Service) ReplenishBalance(ctx context.Context, userId int64, amount float64) error {
-	err := s.userRepo.ChangeBalance(ctx, userId, amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *Service) UpdateUser(ctx context.Context, user models.User) error {
 	err := s.userRepo.UpdateUser(ctx, user)
 	if err != nil {

@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -17,15 +16,6 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			h.Start(ctx, b, update)
 		case "coin":
 			h.GetCoinList(ctx, b, update)
-		case "percent":
-			h.UpdatePercentCmd(ctx, b, update)
-		case "replenish":
-			if len(parts) != 2 {
-				return
-			}
-			amount, _ := strconv.ParseFloat(parts[1], 64)
-			ctx = context.WithValue(ctx, "replenishAmount", amount)
-			h.ReplenishBalance(ctx, b, update)
 		case "startTrading":
 			h.StartTrading(ctx, b, update)
 		case "stopTrading":

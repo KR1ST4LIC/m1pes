@@ -145,7 +145,11 @@ func generateUpdateCoinQuery(coin models.Coin) (string, []interface{}, error) {
 	}
 	if coin.BuyOrderId != "" {
 		setClauses = append(setClauses, fmt.Sprintf("buy_order_id = $%d", i))
-		values = append(values, coin.BuyOrderId)
+		if coin.BuyOrderId == "setNull" {
+			values = append(values, "")
+		} else {
+			values = append(values, coin.BuyOrderId)
+		}
 		i++
 	}
 	if coin.SellOrderId != "" {

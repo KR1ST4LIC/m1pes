@@ -15,11 +15,10 @@ import (
 	"m1pes/internal/models"
 )
 
-type fgh func() error
-
 type (
 	StockService interface {
-		GetCoin(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error)
+		GetCoinFromStockExchange(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error)
+		DeleteCoin(ctx context.Context, coinTag string, userId int64) error
 		GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error)
 		ExistCoin(ctx context.Context, coinTag string) (bool, error)
 		AddCoin(coin models.Coin) error
@@ -80,42 +79,40 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 			// This goroutine waits for action from algorithm.
 			go func() {
 				funcUser := user
-				for {
-					select {
-					case msg := <-h.actionChanMap[funcUser.Id]:
-						var text string
-						var chatId int64
-						coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
-						if err != nil {
-							msg.Action = err.Error()
-						}
-						switch msg.Action {
-						case SellAction:
-							a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
-							d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
-							c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
 
-							def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
+				msg := <-h.actionChanMap[funcUser.Id]
 
-							text = "ПРОДАЖА\n" + def
-							chatId = msg.User.Id
-						case BuyAction:
-							a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
-							d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
-							def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
+				var text string
+				var chatId int64
+				coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
+				if err != nil {
+					msg.Action = err.Error()
+				}
+				switch msg.Action {
+				case SellAction:
+					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
+					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
+					c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
 
-							text = "ПОКУПКА\n" + def
-							chatId = msg.User.Id
-						default:
-							text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
-							chatId = ReportErrorChatId
-						}
-						botMsg := tgbotapi.NewMessage(chatId, text)
-						_, err = b.Send(botMsg)
-						if err != nil {
-							slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-						}
-					}
+					def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
+
+					text = "ПРОДАЖА\n" + def
+					chatId = msg.User.Id
+				case BuyAction:
+					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
+					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
+					def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
+
+					text = "ПОКУПКА\n" + def
+					chatId = msg.User.Id
+				default:
+					text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
+					chatId = ReportErrorChatId
+				}
+				botMsg := tgbotapi.NewMessage(chatId, text)
+				_, err = b.Send(botMsg)
+				if err != nil {
+					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 				}
 			}()
 
@@ -209,7 +206,6 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		if err != nil {
 			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
 		}
-
 		return
 	}
 	// Check over.
@@ -220,83 +216,42 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 
 	// This goroutine waits for action from algorithm.
 	go func() {
-		for {
-			select {
-			case msg := <-h.actionChanMap[update.Message.From.ID]:
-				var text string
-				var chatId int64
+		funcUser := user
 
-				coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
-				if err != nil {
-					msg.Action = err.Error()
-				}
+		msg := <-h.actionChanMap[funcUser.Id]
 
-				switch msg.Action {
-				case SellAction:
-					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
-					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
-					c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
-
-					def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
-
-					text = "ПРОДАЖА\n" + def
-					chatId = msg.User.Id
-				case BuyAction:
-					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
-					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
-					def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
-
-					text = "ПОКУПКА\n" + def
-					chatId = msg.User.Id
-				default:
-					text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
-					chatId = ReportErrorChatId
-				}
-				botMsg := tgbotapi.NewMessage(chatId, text)
-				_, err = b.Send(botMsg)
-				if err != nil {
-					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-				}
-			}
+		var text string
+		var chatId int64
+		coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
+		if err != nil {
+			msg.Action = err.Error()
 		}
+		switch msg.Action {
+		case SellAction:
+			a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
+			d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
+			c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
 
-		//for {
-		//	msg := <-h.actionChanMap[update.Message.From.ID]
-		//
-		//	var text string
-		//	var chatId int64
-		//
-		//	switch msg.Action {
-		//	case SellAction:
-		//		err := h.ss.InsertIncome(msg.User.Id, msg.Coin.Name, msg.Coin.Income, msg.Coin.Count)
-		//		if err != nil {
-		//			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in InsertIncome", err)
-		//		}
-		//
-		//		err = h.us.ReplenishBalance(ctx, msg.User.Id, msg.Coin.Income)
-		//		if err != nil {
-		//			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in ReplenishBalance", err)
-		//		}
-		//
-		//		def := fmt.Sprintf("Монета: %s\nПо цене: %.4f\nКол-во: %.4f\nВы заработали: %.4f 💲", msg.Coin.Name, msg.Coin.CurrentPrice, msg.Coin.Count, msg.Coin.Income)
-		//
-		//		text = "ПРОДАЖА\n" + def
-		//		chatId = msg.User.Id
-		//	case BuyAction:
-		//		def := fmt.Sprintf("Монета: %s\nПо цене: %.4f 💲\nКол-во: %.4f", msg.Coin.Name, msg.Coin.Buy[len(msg.Coin.Buy)-1], msg.Coin.Count/float64(len(msg.Coin.Buy)))
-		//
-		//		text = "ПОКУПКА\n" + def
-		//		chatId = msg.User.Id
-		//	default:
-		//		text = msg.Action
-		//		chatId = ReportErrorChatId
-		//	}
-		//	botMsg := tgbotapi.NewMessage(chatId, text)
-		//	_, err := b.Send(botMsg)
-		//	if err != nil {
-		//		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-		//	}
-		//}
+			def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
+
+			text = "ПРОДАЖА\n" + def
+			chatId = msg.User.Id
+		case BuyAction:
+			a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
+			d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
+			def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
+
+			text = "ПОКУПКА\n" + def
+			chatId = msg.User.Id
+		default:
+			text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
+			chatId = ReportErrorChatId
+		}
+		botMsg := tgbotapi.NewMessage(chatId, text)
+		_, err = b.Send(botMsg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+		}
 	}()
 
 	err = h.as.StartTrading(ctx, update.Message.From.ID, h.actionChanMap)
@@ -316,6 +271,13 @@ func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	err := h.as.StopTrading(ctx, update.Message.From.ID)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
+		return
+	}
+
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Вы успешно остановили торговлю на аккаунте!")
+	_, err = b.Send(msg)
+	if err != nil {
+		log.Println(err)
 	}
 }
 
@@ -352,6 +314,7 @@ func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 		log.Println(err)
 	}
 
+	// Deleting coin from trading.
 	err = h.as.DeleteCoin(ctx, update.Message.From.ID, update.Message.Text)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StopTrading", err)
@@ -366,6 +329,12 @@ func (h *Handler) DeleteCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tg
 		if err != nil {
 			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
 		}
+	}
+
+	// Deleting coin from db.
+	err = h.ss.DeleteCoin(ctx, update.Message.Text, user.Id)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error delete coin", err)
 	}
 }
 
@@ -522,7 +491,7 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 		getCoinReqParams["category"] = "spot"
 		getCoinReqParams["symbol"] = update.Message.Text
 
-		getCoinResp, err := h.ss.GetCoin(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
+		getCoinResp, err := h.ss.GetCoinFromStockExchange(ctx, getCoinReqParams, user.ApiKey, user.SecretKey)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error getting coin from algorithm", err)
 			return
@@ -548,9 +517,6 @@ func (h *Handler) AddCoin(ctx context.Context, b *tgbotapi.BotAPI, update *tgbot
 				log.Println(err)
 			}
 			return
-		}
-		if err != nil {
-			log.Println(err)
 		}
 
 		coin := models.Coin{Name: update.Message.Text, UserId: update.Message.From.ID}

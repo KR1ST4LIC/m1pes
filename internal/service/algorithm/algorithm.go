@@ -17,10 +17,6 @@ import (
 )
 
 const (
-	CreateOrderEndpoint   = "/v5/order/create"
-	CancelOrderEndpoint   = "/v5/order/cancel"
-	GetOrderEndpoint      = "/v5/order/realtime"
-	GetCoinEndpoint       = "/v5/market/tickers"
 	SuccessfulOrderStatus = "Filled"
 )
 
@@ -93,11 +89,17 @@ func (s *Service) StopTrading(ctx context.Context, userID int64) error {
 
 	err := s.uStorageRepo.UpdateUser(ctx, user)
 	if err != nil {
+		slog.ErrorContext(ctx, "Error updating user", err)
 		return err
 	}
 
+	// Stopping and deleting all user.
 	for coinName := range s.stopCoinMap[userID] {
-		s.stopCoinMap[userID][coinName] <- struct{}{}
+		err = s.DeleteCoin(ctx, userID, coinName)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error deleting coin", err)
+			return err
+		}
 	}
 	return nil
 }
@@ -108,55 +110,70 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		s.stopCoinMap[userId][coinTag] <- struct{}{}
 	}
 
+	// Getting user from storage.
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user", err)
 		return err
 	}
 
+	// Getting coin from storage.
 	coin, err := s.sStorageRepo.GetCoin(ctx, userId, coinTag)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting coin", err)
 		return err
 	}
 
+	updateCoin := models.NewCoin(user.Id, coin.Name)
+
+	// Canceling sell order.
+	if coin.SellOrderId != "" {
+		updateCoin.SellOrderId = "setNull"
+
+		cancelReq := models.CancelOrderRequest{
+			Category: "spot",
+			OrderId:  coin.SellOrderId,
+			Symbol:   coin.Name,
+		}
+
+		_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error canceling sell order", err)
+			return err
+		}
+	}
+
+	// Canceling buy order.
+	if coin.BuyOrderId != "" {
+		updateCoin.BuyOrderId = "setNull"
+
+		cancelReq := models.CancelOrderRequest{
+			Category: "spot",
+			OrderId:  coin.BuyOrderId,
+			Symbol:   coin.Name,
+		}
+
+		_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error canceling buy order", err)
+			return err
+		}
+	}
+
+	// Deleting orders' ids from db.
+	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error updating coin", err)
+		return err
+	}
+
 	// If user already bought something.
 	if len(coin.Buy) > 0 {
-		// Getting coin's data.
+		// Getting coin's data from storage.
 		coiniks, err := s.sStorageRepo.GetCoiniks(ctx, coin.Name)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error getting coiniks", err)
 			return err
-		}
-
-		// Canceling sell order.
-		if coin.SellOrderId != "" {
-			cancelReq := models.CancelOrderRequest{
-				Category: "spot",
-				OrderId:  coin.SellOrderId,
-				Symbol:   coin.Name,
-			}
-
-			_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
-			if err != nil {
-				slog.ErrorContext(ctx, "Error canceling sell order", err)
-				return err
-			}
-		}
-
-		// Canceling buy order.
-		if coin.BuyOrderId != "" {
-			cancelReq := models.CancelOrderRequest{
-				Category: "spot",
-				OrderId:  coin.BuyOrderId,
-				Symbol:   coin.Name,
-			}
-
-			_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
-			if err != nil {
-				slog.ErrorContext(ctx, "Error canceling buy order", err)
-				return err
-			}
 		}
 
 		// Creating sell order.
@@ -192,24 +209,13 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 			return err
 		}
 
-		// Getting market sell order.
-		//getReq := make(models.GetOrderRequest)
-		//getReq["category"] = "spot"
-		//getReq["orderId"] = createOrderResp.Result.OrderID
-		//getReq["symbol"] = coin.Name
-		//
-		//getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
-		//if err != nil {
-		//	slog.ErrorContext(ctx, "Error getting order", err)
-		//	return err
-		//}
-		//
-		//currentPrice, err := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
-		//if err != nil {
-		//	slog.ErrorContext(ctx, "Error parsing price to float", err)
-		//	return err
-		//}
+		// Setting all columns of this coin to null.
+		err = s.sStorageRepo.SellCoin(user.Id, coin.Name, currentPrice)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error selling coin", err)
+		}
 
+		// Counting income.
 		var money float64
 		for i := 0; i < len(coin.Buy); i++ {
 			money += coin.Buy[i]
@@ -220,8 +226,6 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		spentMoney := avg * coin.Count
 		earnMoney := currentPrice * coin.Count
 
-		fmt.Println("spentMoney: ", spentMoney, "earnMoney: ", earnMoney)
-
 		income := earnMoney - spentMoney
 
 		err = s.sStorageRepo.InsertIncome(userId, coinTag, income, coin.Count)
@@ -230,17 +234,10 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 			return err
 		}
 	}
-
-	err = s.sStorageRepo.DeleteCoin(ctx, user.Id, coinTag)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error delete coin", err)
-		return err
-	}
-
 	return nil
 }
 
-// These functions are do not need for implementing AlgorithmService.
+// These functions do not need for implementing AlgorithmService.
 
 func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) (error, models.Error) {
 	eris := models.Error{}

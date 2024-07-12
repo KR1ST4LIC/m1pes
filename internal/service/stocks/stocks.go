@@ -33,12 +33,20 @@ func New(stockRepo apiStock.Repository, storageRepo storageStock.Repository) *Se
 	return &Service{apiRepo: stockRepo, storageRepo: storageRepo, stopCoinMap: make(map[string]map[int64]chan struct{})}
 }
 
-func (s *Service) GetCoin(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error) {
+func (s *Service) GetCoinFromStockExchange(ctx context.Context, coinReq models.GetCoinRequest, apiKey, secretKey string) (models.GetCoinResponse, error) {
 	coin, err := s.apiRepo.GetCoin(ctx, coinReq, apiKey, secretKey)
 	if err != nil {
 		return coin, err
 	}
 	return coin, nil
+}
+
+func (s *Service) DeleteCoin(ctx context.Context, coinTag string, userId int64) error {
+	err := s.storageRepo.DeleteCoin(ctx, userId, coinTag)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) GetCoinList(ctx context.Context, userId int64) ([]models.Coin, error) {

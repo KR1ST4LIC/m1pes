@@ -33,22 +33,20 @@ func New() (*App, error) {
 }
 
 func (a *App) Start(ctx context.Context) error {
-	// stock dependencies
+	// Stock dependencies.
 	storageStock := stockPostgres.New(a.cfg.DBConn)
 	apiStock := bybit.New()
 	stockService := stocks.New(apiStock, storageStock)
 
-	// user dependencies
+	// User dependencies.
 	storageUser := userPostgres.New(a.cfg.DBConn)
 	userService := user.New(storageUser)
 
-	//algorithm dependencies
+	// Algorithm dependencies.
 	algoService := algorithm.New(apiStock, storageStock, storageUser)
 
-	// init handler
+	// Init handler.
 	h := handler.New(stockService, userService, algoService, a.bot)
-
-	//h.StartTrading(ctx, a.bot)
 
 	go func() {
 		if err := a.RunTelegramBot(ctx, h); err != nil {

@@ -10,6 +10,7 @@ type User struct {
 	SecretKey        string
 	Status           string
 	TradingActivated bool
+	Buy              bool
 }
 
 func NewUser(userId int64) User {

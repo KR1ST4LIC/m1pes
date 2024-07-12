@@ -81,6 +81,14 @@ func (s *Service) GetCoiniks(ctx context.Context, coinTag string) (models.Coinik
 	return u, nil
 }
 
+func (s *Service) EditBuy(ctx context.Context, userId int64, buy bool) error {
+	err := s.storageRepo.EditBuy(ctx, userId, buy)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error) {
 	resp := models.CreateOrderResponse{}
 	postParams := map[string]interface{}{

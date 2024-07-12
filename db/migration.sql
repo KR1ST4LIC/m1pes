@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS users
     "api_key"           text             default '',
     "secret_key"        text             default '',
     "trading_activated" boolean          default false,
-    "status"            text             default 'none'
+    "status"            text             default 'none',
+    "buy"               boolean          default false
 );
 
 CREATE TABLE IF NOT EXISTS coin

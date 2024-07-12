@@ -16,6 +16,10 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			h.Start(ctx, b, update)
 		case "coin":
 			h.GetCoinList(ctx, b, update)
+		case "stopBuy":
+			h.StopBuy(ctx, b, update)
+		case "startBuy":
+			h.StartBuy(ctx, b, update)
 		case "startTrading":
 			h.StartTrading(ctx, b, update)
 		case "stopTrading":

@@ -25,6 +25,7 @@ type (
 		AddCoin(coin models.Coin) error
 		InsertIncome(userID int64, coinTag string, income, count float64) error
 		GetCoiniks(ctx context.Context, coinTag string) (models.Coiniks, error)
+		EditBuy(ctx context.Context, userId int64, buy bool) error
 		CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error)
 		GetUserWalletBalance(ctx context.Context, apiKey, apiSecret string) (float64, error)
 	}
@@ -153,10 +154,48 @@ func (h *Handler) Start(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 	}
 }
 
+func (h *Handler) StopBuy(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	userId := update.Message.From.ID
+
+	ctx = logging.WithUserId(ctx, userId)
+
+	err := h.ss.EditBuy(ctx, userId, false)
+	if err != nil {
+		log.Println(err)
+	}
+
+	msg := tgbotapi.NewMessage(userId, "Торговля на монетах остановятся сразу как продадутся")
+	_, err = b.Send(msg)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (h *Handler) StartBuy(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	userId := update.Message.From.ID
+
+	ctx = logging.WithUserId(ctx, userId)
+
+	err := h.ss.EditBuy(ctx, userId, true)
+	if err != nil {
+		log.Println(err)
+	}
+
+	msg := tgbotapi.NewMessage(userId, "Торговля на монетах возобновилась")
+	_, err = b.Send(msg)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
 func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
 	userId := update.Message.From.ID
 
 	ctx = logging.WithUserId(ctx, userId)
+	err := h.ss.EditBuy(ctx, userId, true)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// Check if trading already has been started.
 	user, err := h.us.GetUser(ctx, userId)

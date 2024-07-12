@@ -125,8 +125,8 @@ func (r *Repository) NewUser(ctx context.Context, user models.User) error {
 
 func (r *Repository) GetUser(ctx context.Context, userId int64) (models.User, error) {
 	var user models.User
-	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status, api_key, secret_key, trading_activated FROM users WHERE tg_id=$1;", nil, userId)
-	err := res.Scan(&user.USDTBalance, &user.Capital, &user.Percent, &user.Status, &user.ApiKey, &user.SecretKey, &user.TradingActivated)
+	res := r.Conn.QueryRowEx(ctx, "SELECT bal, capital, percent, status, api_key, secret_key, trading_activated, buy FROM users WHERE tg_id=$1;", nil, userId)
+	err := res.Scan(&user.USDTBalance, &user.Capital, &user.Percent, &user.Status, &user.ApiKey, &user.SecretKey, &user.TradingActivated, &user.Buy)
 	if err != nil {
 		return models.User{}, err
 	}

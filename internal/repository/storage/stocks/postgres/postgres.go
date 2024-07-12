@@ -63,6 +63,14 @@ func (r *Repository) GetCoiniks(ctx context.Context, coinName string) (models.Co
 	return coiniks, nil
 }
 
+func (r *Repository) EditBuy(ctx context.Context, userId int64, buy bool) error {
+	_, err := r.Conn.Exec("UPDATE users SET buy = $1 WHERE tg_id = $2;", buy, userId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) ExistCoin(ctx context.Context, coinTag string) (bool, error) {
 	var exist bool
 	rows := r.Conn.QueryRowEx(ctx, "SELECT EXISTS(SELECT coin_name FROM coiniks WHERE coin_name = $1);", nil, coinTag)

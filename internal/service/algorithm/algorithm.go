@@ -306,6 +306,31 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		return err, eris
 	}
 
+	if !user.Buy {
+		if coin.Count == 0 {
+			if coin.BuyOrderId != "" {
+				cancelReq := models.CancelOrderRequest{
+					Category: "spot",
+					OrderId:  coin.BuyOrderId,
+					Symbol:   coin.Name,
+				}
+
+				_, err = s.apiRepo.CancelOrder(ctx, cancelReq, user.ApiKey, user.SecretKey)
+				if err != nil {
+					slog.ErrorContext(ctx, "Error canceling order", err)
+					_, eris.File, eris.Line, _ = runtime.Caller(0)
+					return err, eris
+				}
+			}
+			err = s.DeleteCoin(ctx, user.Id, coin.Name)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error delete coin", err)
+				_, eris.File, eris.Line, _ = runtime.Caller(0)
+				return err, eris
+			}
+		}
+	}
+
 	// If price becomes higher than entry price and amount of coin equals 0 we should raise entryPrice.
 	if currentPrice > coin.EntryPrice && coin.Count == 0 {
 		slog.DebugContext(ctx, "Raising entry price")
@@ -601,33 +626,35 @@ func (s *Service) HandleFilledSellOrder(ctx context.Context, getOrderResp models
 		return err
 	}
 
-	// Creating new buy order.
-	createReq := models.CreateOrderRequest{
-		Category:    "spot",
-		Side:        "Buy",
-		Symbol:      coin.Name,
-		OrderType:   "Limit",
-		Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/sellPrice),
-		MarketUint:  "baseCoin",
-		PositionIdx: 0,
-		Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", resetedCoin.EntryPrice-resetedCoin.Decrement),
-		TimeInForce: "GTC",
-	}
+	if user.Buy {
+		// Creating new buy order.
+		createReq := models.CreateOrderRequest{
+			Category:    "spot",
+			Side:        "Buy",
+			Symbol:      coin.Name,
+			OrderType:   "Limit",
+			Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/sellPrice),
+			MarketUint:  "baseCoin",
+			PositionIdx: 0,
+			Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", resetedCoin.EntryPrice-resetedCoin.Decrement),
+			TimeInForce: "GTC",
+		}
 
-	createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error creating order", err)
-		return err
-	}
+		createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error creating order", err)
+			return err
+		}
 
-	updateCoin = models.NewCoin(user.Id, coin.Name)
-	updateCoin.BuyOrderId = createOrderResp.Result.OrderID
-	updateCoin.SellOrderId = "setNull"
+		updateCoin = models.NewCoin(user.Id, coin.Name)
+		updateCoin.BuyOrderId = createOrderResp.Result.OrderID
+		updateCoin.SellOrderId = "setNull"
 
-	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error updating coin", err)
-		return err
+		err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error updating coin", err)
+			return err
+		}
 	}
 
 	// Sending message for goroutine from handler to notify user about sell
@@ -656,6 +683,11 @@ func (s *Service) HandleFilledSellOrder(ctx context.Context, getOrderResp models
 
 	msg.Coin.CurrentPrice = sellPrice
 	msg.Coin.Income = income
+
+	if !user.Buy {
+		err = s.DeleteCoin(ctx, user.Id, coin.Name)
+		return err
+	}
 
 	actionChanMap[user.Id] <- msg
 

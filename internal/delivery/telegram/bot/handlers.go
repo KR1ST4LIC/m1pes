@@ -68,64 +68,22 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 		log.Fatalln(err)
 	}
 
+	// Starting trading for all users which have tradingActivated as true.
 	for _, user := range users {
-		if user.TradingActivated {
-			ctx = logging.WithUserId(ctx, user.Id)
-
-			if _, ok := h.actionChanMap[user.Id]; !ok {
-				h.actionChanMap[user.Id] = make(chan models.Message)
-			}
-
-			// This goroutine waits for action from algorithm.
-			go func() {
-				funcUser := user
-
-				msg := <-h.actionChanMap[funcUser.Id]
-
-				var text string
-				var chatId int64
-				coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
-				if err != nil {
-					msg.Action = err.Error()
-				}
-				switch msg.Action {
-				case SellAction:
-					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
-					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
-					c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
-
-					def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
-
-					text = "ПРОДАЖА\n" + def
-					chatId = msg.User.Id
-				case BuyAction:
-					a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
-					d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
-					def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
-
-					text = "ПОКУПКА\n" + def
-					chatId = msg.User.Id
-				default:
-					text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
-					chatId = ReportErrorChatId
-				}
-				botMsg := tgbotapi.NewMessage(chatId, text)
-				_, err = b.Send(botMsg)
-				if err != nil {
-					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-				}
-			}()
-
-			err = h.as.StartTrading(ctx, user.Id, h.actionChanMap)
-			if err != nil {
-				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
-			}
-			msg := tgbotapi.NewMessage(user.Id, "Ты начал торговлю, бот пришлет сообщение если купит или продаст монеты!")
-			_, err = b.Send(msg)
-			if err != nil {
-				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
-			}
+		if !user.TradingActivated {
+			fmt.Println("no no no an")
+			continue
 		}
+
+		update := &tgbotapi.Update{
+			Message: &tgbotapi.Message{
+				From: &tgbotapi.User{
+					ID: user.Id,
+				},
+			},
+		}
+
+		h.StartTrading(ctx, b, update)
 	}
 
 	return h
@@ -200,7 +158,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
 	}
 
-	if user.TradingActivated {
+	if user.TradingActivated && update.Message.Text != "" {
 		botMsg := tgbotapi.NewMessage(userId, "Вы уже начали торговлю!)")
 		_, err := b.Send(botMsg)
 		if err != nil {
@@ -258,7 +216,7 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in StartTrading", err)
 	}
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Ты начал торговлю, бот пришлет сообщение если купит или продаст монеты!")
+	msg := tgbotapi.NewMessage(update.Message.From.ID, "Ты начал торговлю, бот пришлет сообщение если купит или продаст монеты!")
 	_, err = b.Send(msg)
 	if err != nil {
 		log.Println(err)

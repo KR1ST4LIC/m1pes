@@ -64,7 +64,7 @@ func (r *Repository) GetCoiniks(ctx context.Context, coinName string) (models.Co
 }
 
 func (r *Repository) EditBuy(ctx context.Context, userId int64, buy bool) error {
-	_, err := r.Conn.Exec("UPDATE users SET buy = $1 WHERE tg_id = $2;", buy, userId)
+	_, err := r.Conn.ExecEx(ctx, "UPDATE users SET buy = $1 WHERE tg_id = $2;", nil, buy, userId)
 	if err != nil {
 		return err
 	}

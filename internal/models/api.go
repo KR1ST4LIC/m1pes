@@ -153,20 +153,3 @@ type OrderCreate struct {
 	Qty    string
 	Price  string
 }
-
-type Response struct {
-	RetCode    int      `json:"retCode"`
-	RetMsg     string   `json:"retMsg"`
-	Result     Result   `json:"result"`
-	RetExtInfo struct{} `json:"retExtInfo"`
-	Time       int64    `json:"time"`
-}
-
-type Result struct {
-	List []Account `json:"list"`
-}
-
-type Account struct {
-	TotalEquity        string `json:"totalEquity"`
-	TotalWalletBalance string `json:"totalWalletBalance"`
-}

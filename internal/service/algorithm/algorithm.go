@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"m1pes/internal/logging"
 	"runtime"
 	"strconv"
 	"strings"
@@ -40,6 +41,8 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 
 	// In that for loop we are starting handling every user's coin.
 	for _, coin := range coinList {
+		ctx = logging.WithCoinTag(ctx, coin.Name)
+
 		// init map that stores coin name as key and map2 as value
 		// map2 stores userId as key and struct{} as value
 		if _, ok := s.stopCoinMap[userId][coin.Name]; ok {
@@ -51,7 +54,11 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 		}
 		s.stopCoinMap[userId][coin.Name] = make(chan struct{})
 
-		go func(coin models.Coin) {
+		go func(ctx context.Context, coin models.Coin) {
+			ctx = logging.WithCoinTag(ctx, coin.Name)
+
+			//slog.DebugContext(ctx, "CTX IN GOUROTINE 11111111!!!! ", "jfjfjf")
+
 			for {
 				select {
 				case <-s.stopCoinMap[userId][coin.Name]:
@@ -68,7 +75,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					}
 				}
 			}
-		}(coin)
+		}(ctx, coin)
 	}
 
 	// Indicates that the user has started trading.
@@ -124,12 +131,8 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 		return err
 	}
 
-	updateCoin := models.NewCoin(user.Id, coin.Name)
-
 	// Canceling sell order.
 	if coin.SellOrderId != "" {
-		updateCoin.SellOrderId = "setNull"
-
 		cancelReq := models.CancelOrderRequest{
 			Category: "spot",
 			OrderId:  coin.SellOrderId,
@@ -145,8 +148,6 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 
 	// Canceling buy order.
 	if coin.BuyOrderId != "" {
-		updateCoin.BuyOrderId = "setNull"
-
 		cancelReq := models.CancelOrderRequest{
 			Category: "spot",
 			OrderId:  coin.BuyOrderId,
@@ -158,13 +159,6 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 			slog.ErrorContext(ctx, "Error canceling buy order", err)
 			return err
 		}
-	}
-
-	// Deleting orders' ids from db.
-	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error updating coin", err)
-		return err
 	}
 
 	// If user already bought something.
@@ -209,12 +203,6 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 			return err
 		}
 
-		// Setting all columns of this coin to null.
-		err = s.sStorageRepo.SellCoin(user.Id, coin.Name, currentPrice)
-		if err != nil {
-			slog.ErrorContext(ctx, "Error selling coin", err)
-		}
-
 		// Counting income.
 		var money float64
 		for i := 0; i < len(coin.Buy); i++ {
@@ -234,13 +222,21 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 			return err
 		}
 	}
+
+	// Setting all coin columns to null.
+	err = s.sStorageRepo.SetCoinToDefault(ctx, userId, coinTag)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error setting coin to default", err)
+		return err
+	}
+
 	return nil
 }
 
 // These functions do not need for implementing AlgorithmService.
 
 func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) (error, models.Error) {
-	eris := models.Error{}
+	var eris models.Error
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting user from algorithm", err)
@@ -353,6 +349,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
+	ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
 	// If that buy order has no errors and order status is filled.
 	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
@@ -379,6 +376,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
 	}
+	ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
 	// If that sell order has no errors and order status is filled.
 	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Sell" {
@@ -442,6 +440,7 @@ func (s *Service) HandleRaisingEntryPrice(ctx context.Context, currentPrice floa
 		slog.ErrorContext(ctx, "Error creating order", err)
 		return err
 	}
+	ctx = logging.WithOrderId(ctx, createOrderResp.Result.OrderID)
 
 	updateCoin := models.NewCoin(user.Id, coin.Name)
 	updateCoin.BuyOrderId = createOrderResp.Result.OrderID
@@ -484,8 +483,6 @@ func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.
 		slog.ErrorContext(ctx, "Error parsing count to float", err)
 		return err
 	}
-
-	fmt.Println(count)
 
 	coin.Count += count
 

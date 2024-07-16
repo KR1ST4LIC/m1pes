@@ -17,6 +17,7 @@ type Repository interface {
 	ResetCoin(ctx context.Context, coin models.Coin, user models.User) error
 	UpdateCount(userID int64, count float64, coinTag string, decrement float64, buy []float64) error
 	SellCoin(userID int64, coinTag string, sellPrice float64) error
+	SetCoinToDefault(ctx context.Context, userId int64, coinTag string) error
 	DeleteCoin(ctx context.Context, userID int64, coinTag string) error
 	InsertIncome(userID int64, coinTag string, income, count float64) error
 }

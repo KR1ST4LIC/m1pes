@@ -194,6 +194,14 @@ func (r *Repository) UpdateCount(userID int64, count float64, coinTag string, de
 	return nil
 }
 
+func (r *Repository) SetCoinToDefault(ctx context.Context, userId int64, coinTag string) error {
+	_, err := r.Conn.ExecEx(ctx, "UPDATE coin SET (count, buy, entry_price, decrement, buy_order_id, sell_order_id) = (DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT) WHERE (user_id,coin_name)=($1,$2);", nil, userId, coinTag)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repository) ResetCoin(ctx context.Context, coin models.Coin, user models.User) error {
 	_, err := r.Conn.ExecEx(ctx, "UPDATE coin SET (entry_price, decrement) = ($1,$4) WHERE (user_id,coin_name)=($2,$3);", nil, coin.EntryPrice, user.Id, coin.Name, user.Percent*coin.EntryPrice)
 	if err != nil {
@@ -207,7 +215,6 @@ func (r *Repository) SellCoin(userID int64, coinTag string, sellPrice float64) e
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 

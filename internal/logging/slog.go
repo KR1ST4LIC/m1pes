@@ -15,7 +15,9 @@ func NewSlogWrapper(next slog.Handler) slog.Handler {
 }
 
 type LogCtx struct {
-	userId int64
+	userId  int64
+	orderId string
+	coinTag string
 }
 
 var LogCtxKey = "LogCtxKey"
@@ -28,6 +30,12 @@ func (s SlogWrapper) Handle(ctx context.Context, record slog.Record) error {
 	if c, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
 		if c.userId != 0 {
 			record.Add("userId", c.userId)
+		}
+		if c.orderId != "" {
+			record.Add("orderId", c.orderId)
+		}
+		if c.coinTag != "" {
+			record.Add("coinTag", c.coinTag)
 		}
 	}
 	return s.next.Handle(ctx, record)
@@ -42,7 +50,27 @@ func (s SlogWrapper) WithGroup(name string) slog.Handler {
 }
 
 func WithUserId(ctx context.Context, userId int64) context.Context {
+	if c, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
+		c.userId = userId
+		return context.WithValue(ctx, LogCtxKey, c)
+	}
 	return context.WithValue(ctx, LogCtxKey, LogCtx{userId: userId})
+}
+
+func WithOrderId(ctx context.Context, orderId string) context.Context {
+	if c, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
+		c.orderId = orderId
+		return context.WithValue(ctx, LogCtxKey, c)
+	}
+	return context.WithValue(ctx, LogCtxKey, LogCtx{orderId: orderId})
+}
+
+func WithCoinTag(ctx context.Context, coinTag string) context.Context {
+	if c, ok := ctx.Value(LogCtxKey).(LogCtx); ok {
+		c.coinTag = coinTag
+		return context.WithValue(ctx, LogCtxKey, c)
+	}
+	return context.WithValue(ctx, LogCtxKey, LogCtx{coinTag: coinTag})
 }
 
 type ErrorWithCtx struct {

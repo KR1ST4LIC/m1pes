@@ -71,7 +71,6 @@ func New(ss StockService, us UserService, as AlgorithmService, b *tgbotapi.BotAP
 	// Starting trading for all users which have tradingActivated as true.
 	for _, user := range users {
 		if !user.TradingActivated {
-			fmt.Println("no no no an")
 			continue
 		}
 

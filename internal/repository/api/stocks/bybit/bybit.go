@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"m1pes/internal/logging"
 	"m1pes/internal/models"
 	"net/http"
 	"strconv"
@@ -93,7 +94,7 @@ func (r *Repository) GetUserWalletBalance(ctx context.Context, req models.GetUse
 func (r *Repository) CreateOrder(ctx context.Context, orderReq models.CreateOrderRequest, apiKey, secretKey string) (models.CreateOrderResponse, error) {
 	jsonData, err := json.Marshal(orderReq)
 	if err != nil {
-		return models.CreateOrderResponse{}, fmt.Errorf("marshal order request failed: %w", err)
+		return models.CreateOrderResponse{}, logging.WrapError(ctx, fmt.Errorf("marshal order request failed: %w", err))
 	}
 
 	body, err := r.CreateSignRequestAndGetRespBody(string(jsonData), CreateOrderEndpoint, http.MethodPost, apiKey, secretKey)

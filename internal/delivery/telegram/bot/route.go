@@ -28,6 +28,8 @@ func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotap
 			h.DeleteCoinCmd(ctx, b, update)
 		case "addCoin":
 			h.AddCoinCmd(ctx, b, update)
+		case "changeKeys":
+			h.ChangeApiAndSecretKeyCmd(ctx, b, update)
 		default:
 			h.UnknownCommand(ctx, b, update)
 		}

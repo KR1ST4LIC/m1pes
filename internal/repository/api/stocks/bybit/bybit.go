@@ -26,6 +26,7 @@ const (
 	GetOrderEndpoint      = "/v5/order/realtime"
 	GetUserWalletEndpoint = "/v5/account/wallet-balance"
 	GetCoinEndpoint       = "/v5/market/tickers"
+	GetApiKeyPermissions  = "/v5/user/query-api"
 
 	SuccessfulOrderStatus = "Filled"
 )
@@ -168,27 +169,35 @@ func (r *Repository) CreateSignRequestAndGetRespBody(params, endPoint, method, a
 	var request *http.Request
 	switch method {
 	case http.MethodGet:
-		paramsMap := make(map[string]interface{})
+		if params != "" {
+			paramsMap := make(map[string]interface{})
 
-		err := json.Unmarshal([]byte(params), &paramsMap)
-		if err != nil {
-			return nil, err
-		}
-
-		params = ""
-		isFirst := true
-		for key, val := range paramsMap {
-			if isFirst {
-				params += fmt.Sprintf("%s=%v", key, val)
-				isFirst = false
-				continue
+			err := json.Unmarshal([]byte(params), &paramsMap)
+			if err != nil {
+				return nil, err
 			}
-			params += fmt.Sprintf("&%s=%v", key, val)
-		}
 
-		request, err = http.NewRequest(method, URL+endPoint+"?"+params, nil)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed create new request")
+			params = ""
+			isFirst := true
+			for key, val := range paramsMap {
+				if isFirst {
+					params += fmt.Sprintf("%s=%v", key, val)
+					isFirst = false
+					continue
+				}
+				params += fmt.Sprintf("&%s=%v", key, val)
+			}
+
+			request, err = http.NewRequest(method, URL+endPoint+"?"+params, nil)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed create new request")
+			}
+		} else {
+			req, err := http.NewRequest(method, URL+endPoint, nil)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed create new request")
+			}
+			request = req
 		}
 	case http.MethodPost:
 		newRequest, err := http.NewRequest(method, URL+endPoint, bytes.NewBuffer([]byte(params)))

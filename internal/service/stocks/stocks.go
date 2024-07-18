@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"m1pes/internal/repository/api/stocks/bybit"
+	"net/http"
 	"strconv"
 
 	"m1pes/internal/models"
@@ -39,6 +41,26 @@ func (s *Service) GetCoinFromStockExchange(ctx context.Context, coinReq models.G
 		return coin, err
 	}
 	return coin, nil
+}
+
+func (s *Service) GetApiKeyPermissions(ctx context.Context, apiKey, apiSecret string) (models.GetApiKeyPermissionsResponse, error) {
+	var resp models.GetApiKeyPermissionsResponse
+
+	byteResp, err := s.apiRepo.CreateSignRequestAndGetRespBody("", bybit.GetApiKeyPermissions, http.MethodGet, apiKey, apiSecret)
+	if err != nil {
+		slog.ErrorContext(ctx, "error in creating request", "err", err)
+		return models.GetApiKeyPermissionsResponse{}, err
+	}
+
+	//fmt.Println(string(byteResp))
+
+	err = json.Unmarshal(byteResp, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "error in unmarshalling response", "err", err)
+		return models.GetApiKeyPermissionsResponse{}, err
+	}
+
+	return resp, nil
 }
 
 func (s *Service) DeleteCoin(ctx context.Context, coinTag string, userId int64) error {

@@ -145,6 +145,20 @@ type GetUserWalletResponse struct {
 	} `json:"result"`
 }
 
+// -----Get api key permissions endpoint------
+
+type GetApiKeyPermissionsResponse struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	Result  struct {
+		ReadOnly    int `json:"readOnly"`
+		Permissions struct {
+			Spot   []string `json:"Spot"`
+			Wallet []string `json:"Wallet"`
+		} `json:"permissions"`
+	} `json:"result"`
+}
+
 // -----Stupid coin endpoint------
 
 type OrderCreate struct {

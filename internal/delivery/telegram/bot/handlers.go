@@ -27,6 +27,7 @@ type (
 		EditBuy(ctx context.Context, userId int64, buy bool) error
 		CreateOrder(apiKey, apiSecret string, order models.OrderCreate) (string, error)
 		GetUserWalletBalance(ctx context.Context, apiKey, apiSecret string) (float64, error)
+		GetApiKeyPermissions(ctx context.Context, apiKey, apiSecret string) (models.GetApiKeyPermissionsResponse, error)
 	}
 
 	UserService interface {
@@ -151,21 +152,35 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 		log.Println(err)
 	}
 
-	// Check if trading already has been started.
 	user, err := h.us.GetUser(ctx, userId)
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetUser", err)
 	}
 
-	if user.TradingActivated && update.Message.Text != "" {
-		botMsg := tgbotapi.NewMessage(userId, "Вы уже начали торговлю!)")
-		_, err := b.Send(botMsg)
-		if err != nil {
-			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+	// If this handler was triggered by message from user.
+	if update.Message.Text != "" {
+		// Check if trading already has been started.
+		if user.TradingActivated {
+			botMsg := tgbotapi.NewMessage(userId, "Вы уже начали торговлю!)")
+			_, err = b.Send(botMsg)
+			if err != nil {
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+			}
+			return
 		}
-		return
+		// Check over.
+
+		// Getting user's api and secret keys.
+		if user.ApiKey == "" || user.SecretKey == "" {
+			botMsg := tgbotapi.NewMessage(userId, "У вас отсутсвуют api ключи, чтобы добавить их - /changeKeys  Введите ваш api и secret ключи через пробел.\nВАЖНО: у api ключа обязательно должны быть разрешения на: запись и чтение, торговлю на спотовом рынку и вывод средств для сбора комиссии.")
+			_, err = b.Send(botMsg)
+			if err != nil {
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+			}
+
+			return
+		}
 	}
-	// Check over.
 
 	if _, ok := h.actionChanMap[userId]; !ok {
 		h.actionChanMap[userId] = make(chan models.Message)
@@ -235,6 +250,81 @@ func (h *Handler) StopTrading(ctx context.Context, b *tgbotapi.BotAPI, update *t
 	_, err = b.Send(msg)
 	if err != nil {
 		log.Println(err)
+	}
+}
+
+func (h *Handler) ChangeApiAndSecretKeyCmd(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	botMsg := tgbotapi.NewMessage(update.Message.From.ID, "Введите ваш api и secret ключи через пробел.\nВАЖНО: у api ключа обязательно должны быть разрешения на: запись и чтение, торговлю на спотовом рынке и вывод средств для сбора комиссии.")
+	_, err := b.Send(botMsg)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+	}
+
+	updateUser := models.NewUser(update.Message.From.ID)
+	updateUser.Status = "changeKeys"
+
+	err = h.us.UpdateUser(ctx, updateUser)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in UpdateUser", err)
+	}
+}
+
+func (h *Handler) ChangeApiAndSecretKey(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	ctx = logging.WithUserId(ctx, update.Message.Chat.ID)
+
+	keys := strings.Split(update.Message.Text, " ")
+
+	perm, err := h.ss.GetApiKeyPermissions(ctx, keys[0], keys[1])
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in NewApiAndSecretKey", err)
+	}
+
+	//fmt.Println("HJHJJHJJH", perm)
+
+	// Checking permissions.
+
+	var isAllowed int
+	for _, permission := range perm.Result.Permissions.Wallet {
+		if permission == "Withdraw" {
+			isAllowed++
+			break
+		}
+	}
+
+	for _, permission := range perm.Result.Permissions.Spot {
+		if permission == "SpotTrade" {
+			isAllowed++
+			break
+		}
+	}
+
+	if isAllowed != 2 || perm.Result.ReadOnly != 0 {
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "В указанном api ключе отсутствуют некоторые разрешения.")
+		_, err = b.Send(msg)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
+		}
+
+		return
+	}
+
+	// If everything ok:
+
+	updateUser := models.NewUser(update.Message.From.ID)
+	updateUser.ApiKey = keys[0]
+	updateUser.SecretKey = keys[1]
+
+	err = h.us.UpdateUser(ctx, updateUser)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in UpdateUser", err)
+	}
+
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Вы успешно изменили свои ключи ;)")
+	_, err = b.Send(msg)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in sending message", err)
 	}
 }
 
@@ -524,6 +614,16 @@ func (h *Handler) UnknownCommand(ctx context.Context, b *tgbotapi.BotAPI, update
 		h.AddCoin(ctx, b, update)
 	case "deleteCoin":
 		h.DeleteCoin(ctx, b, update)
+	case "changeKeys":
+		h.ChangeApiAndSecretKey(ctx, b, update)
+
+		updateUser := models.NewUser(update.Message.From.ID)
+		updateUser.Status = "none"
+
+		err = h.us.UpdateUser(ctx, updateUser)
+		if err != nil {
+			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in UpdateUser", err)
+		}
 	default:
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Такой команды нет")
 		_, err := b.Send(msg)

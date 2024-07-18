@@ -62,6 +62,17 @@ func generateUpdateUserQuery(user models.User) (string, []interface{}, error) {
 		values = append(values, user.Status)
 		i++
 	}
+	if user.ApiKey != "" {
+		setClauses = append(setClauses, fmt.Sprintf("api_key = $%d", i))
+		values = append(values, user.ApiKey)
+		i++
+	}
+	if user.SecretKey != "" {
+		setClauses = append(setClauses, fmt.Sprintf("secret_key = $%d", i))
+		values = append(values, user.SecretKey)
+		i++
+	}
+
 	setClauses = append(setClauses, fmt.Sprintf("trading_activated = $%d", i))
 	values = append(values, user.TradingActivated)
 	i++

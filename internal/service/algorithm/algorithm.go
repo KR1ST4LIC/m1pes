@@ -57,8 +57,6 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 		go func(ctx context.Context, coin models.Coin) {
 			ctx = logging.WithCoinTag(ctx, coin.Name)
 
-			//slog.DebugContext(ctx, "CTX IN GOUROTINE 11111111!!!! ", "jfjfjf")
-
 			for {
 				select {
 				case <-s.stopCoinMap[userId][coin.Name]:

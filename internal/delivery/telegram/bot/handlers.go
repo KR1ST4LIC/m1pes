@@ -188,41 +188,43 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 
 	// This goroutine waits for action from algorithm.
 	go func() {
-		funcUser := user
+		for {
+			funcUser := user
 
-		msg := <-h.actionChanMap[funcUser.Id]
+			msg := <-h.actionChanMap[funcUser.Id]
 
-		var text string
-		var chatId int64
-		coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
-		if err != nil {
-			msg.Action = err.Error()
-		}
-		switch msg.Action {
-		case SellAction:
-			a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
-			d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
-			c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
+			var text string
+			var chatId int64
+			coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
+			if err != nil {
+				msg.Action = err.Error()
+			}
+			switch msg.Action {
+			case SellAction:
+				a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))
+				d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count))
+				c := trimTrailingZeros(fmt.Sprintf("%.5f", msg.Coin.Income))
 
-			def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
+				def := fmt.Sprintf("Монета: %s\nПо цене: %s\nКол-во: %s\nВы заработали: %s 💲", msg.Coin.Name, a, d, c)
 
-			text = "ПРОДАЖА\n" + def
-			chatId = msg.User.Id
-		case BuyAction:
-			a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
-			d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
-			def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
+				text = "ПРОДАЖА\n" + def
+				chatId = msg.User.Id
+			case BuyAction:
+				a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.Buy[len(msg.Coin.Buy)-1]))
+				d := trimTrailingZeros(fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", msg.Coin.Count/float64(len(msg.Coin.Buy))))
+				def := fmt.Sprintf("Монета: %s\nПо цене: %s 💲\nКол-во: %s", msg.Coin.Name, a, d)
 
-			text = "ПОКУПКА\n" + def
-			chatId = msg.User.Id
-		default:
-			text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
-			chatId = ReportErrorChatId
-		}
-		botMsg := tgbotapi.NewMessage(chatId, text)
-		_, err = b.Send(botMsg)
-		if err != nil {
-			slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+				text = "ПОКУПКА\n" + def
+				chatId = msg.User.Id
+			default:
+				text = fmt.Sprintf("Ошибка: %s \nfile: %s line: %d", msg.Action, msg.File, msg.Line)
+				chatId = ReportErrorChatId
+			}
+			botMsg := tgbotapi.NewMessage(chatId, text)
+			_, err = b.Send(botMsg)
+			if err != nil {
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+			}
 		}
 	}()
 
@@ -280,8 +282,6 @@ func (h *Handler) ChangeApiAndSecretKey(ctx context.Context, b *tgbotapi.BotAPI,
 	if err != nil {
 		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in NewApiAndSecretKey", err)
 	}
-
-	//fmt.Println("HJHJJHJJH", perm)
 
 	// Checking permissions.
 

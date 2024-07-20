@@ -2,12 +2,29 @@ package bot
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"m1pes/internal/logging"
+	"runtime/debug"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (h *Handler) Route(ctx context.Context, b *tgbotapi.BotAPI, update *tgbotapi.Update) {
+	// This function needs for catching panics.
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "Recovered in Handler.Route", slog.String("stacktrace", string(debug.Stack())), r)
+
+			botMsg := tgbotapi.NewMessage(ReportErrorChatId, fmt.Sprintf("stacktrace: %s\n\npanic: %v", string(debug.Stack()), r))
+			_, err := b.Send(botMsg)
+			if err != nil {
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+			}
+		}
+	}()
+
 	if update.Message != nil && update.Message.Chat.IsPrivate() {
 		parts := strings.Split(update.Message.Command(), "_")
 

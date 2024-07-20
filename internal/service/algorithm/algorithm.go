@@ -350,16 +350,18 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
 	// If that buy order has no errors and order status is filled.
-	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
-		slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
+	if len(getOrderResp.Result.List) > 0 {
+		if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
+			slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
 
-		err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
-		if err != nil {
-			slog.ErrorContext(ctx, "Error handling filled buy order", err)
-			_, eris.File, eris.Line, _ = runtime.Caller(0)
-			return err, eris
+			err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error handling filled buy order", err)
+				_, eris.File, eris.Line, _ = runtime.Caller(0)
+				return err, eris
+			}
+			return nil, eris
 		}
-		return nil, eris
 	}
 
 	// Checking if SELL ORDER has been fulfilled.
@@ -377,14 +379,16 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
 	// If that sell order has no errors and order status is filled.
-	if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Sell" {
-		slog.DebugContext(ctx, "fulfilled SELL ORDER was found")
+	if len(getOrderResp.Result.List) > 0 {
+		if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Sell" {
+			slog.DebugContext(ctx, "fulfilled SELL ORDER was found")
 
-		err = s.HandleFilledSellOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
-		if err != nil {
-			slog.ErrorContext(ctx, "Error handling filled sell order", err)
-			_, eris.File, eris.Line, _ = runtime.Caller(0)
-			return err, eris
+			err = s.HandleFilledSellOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error handling filled sell order", err)
+				_, eris.File, eris.Line, _ = runtime.Caller(0)
+				return err, eris
+			}
 		}
 	}
 	return nil, eris

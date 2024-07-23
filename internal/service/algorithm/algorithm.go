@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"m1pes/internal/logging"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,19 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 		s.stopCoinMap[userId][coin.Name] = make(chan struct{})
 
 		go func(ctx context.Context, coin models.Coin) {
+			// This function needs for catching panics.
+			defer func() {
+				if r := recover(); r != nil {
+					slog.ErrorContext(ctx, "Recovered in goroutine in Service.StartTrading", slog.String("stacktrace", string(debug.Stack())), r)
+
+					actionChanMap[userId] <- models.Message{
+						Coin:   coin,
+						Action: r.(string),
+						File:   string(debug.Stack()),
+					}
+				}
+			}()
+
 			ctx = logging.WithCoinTag(ctx, coin.Name)
 
 			for {
@@ -66,6 +80,7 @@ func (s *Service) StartTrading(ctx context.Context, userId int64, actionChanMap 
 					err, eris := s.HandleCoinUpdate(ctx, coin, userId, actionChanMap)
 					if err != nil {
 						actionChanMap[userId] <- models.Message{
+							Coin:   coin,
 							Action: err.Error(),
 							File:   eris.File,
 							Line:   eris.Line,
@@ -362,6 +377,11 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 			}
 			return nil, eris
 		}
+	}
+
+	// If SELL ORDER does not exist then skip.
+	if coin.SellOrderId == "" {
+		return nil, eris
 	}
 
 	// Checking if SELL ORDER has been fulfilled.

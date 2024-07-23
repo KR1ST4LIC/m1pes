@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -188,6 +189,19 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 
 	// This goroutine waits for action from algorithm.
 	go func() {
+		// This function needs for catching panics.
+		defer func() {
+			if r := recover(); r != nil {
+				slog.ErrorContext(ctx, "Recovered in goroutine in Handler.StartTrading", slog.String("stacktrace", string(debug.Stack())), r)
+
+				botMsg := tgbotapi.NewMessage(ReportErrorChatId, fmt.Sprintf("stacktrace: %s\n\npanic: %v", string(debug.Stack()), r))
+				_, err := b.Send(botMsg)
+				if err != nil {
+					slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in SendMessage", err)
+				}
+			}
+		}()
+
 		for {
 			funcUser := user
 
@@ -197,8 +211,10 @@ func (h *Handler) StartTrading(ctx context.Context, b *tgbotapi.BotAPI, update *
 			var chatId int64
 			coiniks, err := h.ss.GetCoiniks(ctx, msg.Coin.Name)
 			if err != nil {
+				slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in GetCoiniks", err)
 				msg.Action = err.Error()
 			}
+
 			switch msg.Action {
 			case SellAction:
 				a := trimTrailingZeros(fmt.Sprintf("%f", msg.Coin.CurrentPrice))

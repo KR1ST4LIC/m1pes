@@ -375,32 +375,34 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		return nil, eris
 	}
 
-	// Checking if BUY ORDER has been fulfilled.
-	getReq := make(models.GetOrderRequest)
-	getReq["category"] = "spot"
-	getReq["orderId"] = coin.BuyOrderId // <- BUY ORDER ID!
-	getReq["symbol"] = coin.Name
+	if coin.BuyOrderId != "" {
+		// Checking if BUY ORDER has been fulfilled.
+		getReq := make(models.GetOrderRequest)
+		getReq["category"] = "spot"
+		getReq["orderId"] = coin.BuyOrderId // <- BUY ORDER ID!
+		getReq["symbol"] = coin.Name
 
-	getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error getting order", err)
-		_, eris.File, eris.Line, _ = runtime.Caller(0)
-		return err, eris
-	}
-	ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
+		getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error getting order", err)
+			_, eris.File, eris.Line, _ = runtime.Caller(0)
+			return err, eris
+		}
+		ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
-	// If that buy order has no errors and order status is filled.
-	if len(getOrderResp.Result.List) > 0 {
-		if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
-			slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
+		// If that buy order has no errors and order status is filled.
+		if len(getOrderResp.Result.List) > 0 {
+			if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
+				slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
 
-			err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap, candik)
-			if err != nil {
-				slog.ErrorContext(ctx, "Error handling filled buy order", err)
-				_, eris.File, eris.Line, _ = runtime.Caller(0)
-				return err, eris
+				err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap, candik)
+				if err != nil {
+					slog.ErrorContext(ctx, "Error handling filled buy order", err)
+					_, eris.File, eris.Line, _ = runtime.Caller(0)
+					return err, eris
+				}
+				return nil, eris
 			}
-			return nil, eris
 		}
 	}
 
@@ -410,12 +412,12 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	}
 
 	// Checking if SELL ORDER has been fulfilled.
-	getReq = make(models.GetOrderRequest)
+	getReq := make(models.GetOrderRequest)
 	getReq["category"] = "spot"
 	getReq["orderId"] = coin.SellOrderId // <- SELL ORDER ID!
 	getReq["symbol"] = coin.Name
 
-	getOrderResp, err = s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
+	getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error getting order", err)
 		_, eris.File, eris.Line, _ = runtime.Caller(0)

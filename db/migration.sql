@@ -3,13 +3,16 @@ CREATE TABLE IF NOT EXISTS users
     "id"                SERIAL,
     "tg_id"             bigint primary key,
     "bal"               double precision default 0,
-    "capital"           double precision default 0,
     "percent"           double precision,
     "api_key"           text             default '',
     "secret_key"        text             default '',
     "trading_activated" boolean          default false,
     "status"            text             default 'none',
-    "buy"               boolean          default false
+    "buy"               boolean          default false,
+    "capital"           double precision default 0,
+    "payment"           boolean          default false,
+    "date_of_payment"   timestamp        default  now() not null,
+    "paid_amount"       double precision default 0
 );
 
 CREATE TABLE IF NOT EXISTS coin

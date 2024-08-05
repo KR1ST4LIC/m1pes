@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"m1pes/internal/logging"
 	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
+
+	"m1pes/internal/logging"
 
 	"m1pes/internal/delivery/telegram/bot"
 	"m1pes/internal/models"
@@ -249,6 +250,8 @@ func (s *Service) DeleteCoin(ctx context.Context, userId int64, coinTag string) 
 // These functions do not need for implementing AlgorithmService.
 
 func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId int64, actionChanMap map[int64]chan models.Message) (error, models.Error) {
+	var candik bool
+	candik = true
 	var eris models.Error
 	user, err := s.uStorageRepo.GetUser(ctx, userId)
 	if err != nil {
@@ -285,6 +288,28 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 
 	user.USDTBalance = userUSDTBalance
 
+	list, err := s.sStorageRepo.GetCoinList(ctx, user.Id)
+	if err != nil {
+		slog.ErrorContext(logging.ErrorCtx(ctx, err), "error in Algorithm.GetCoinList", err)
+	}
+
+	var userSum float64
+	for i := 0; i < len(list); i++ {
+		var coinSum float64
+		for d := 0; d < len(list[i].Buy); d++ {
+			coinSum += list[i].Buy[d]
+		}
+
+		if len(list[i].Buy) != 0 {
+			avg := coinSum / float64(len(list[i].Buy))
+
+			userSum += list[i].Count * avg
+		}
+	}
+
+	if userSum > userUSDTBalance {
+		candik = false
+	}
 	// Getting current price of coin from api.
 	getCoinReqParams := make(models.GetCoinRequest)
 	getCoinReqParams["category"] = "spot"
@@ -341,7 +366,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	if currentPrice > coin.EntryPrice && coin.Count == 0 {
 		slog.DebugContext(ctx, "Raising entry price")
 
-		err = s.HandleRaisingEntryPrice(ctx, currentPrice, coin, user, coiniks)
+		err = s.HandleRaisingEntryPrice(ctx, currentPrice, coin, user, coiniks, candik)
 		if err != nil {
 			slog.ErrorContext(ctx, "Error handling entry price", err)
 			_, eris.File, eris.Line, _ = runtime.Caller(0)
@@ -369,7 +394,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
 			slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
 
-			err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap)
+			err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap, candik)
 			if err != nil {
 				slog.ErrorContext(ctx, "Error handling filled buy order", err)
 				_, eris.File, eris.Line, _ = runtime.Caller(0)
@@ -414,7 +439,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 	return nil, eris
 }
 
-func (s *Service) HandleRaisingEntryPrice(ctx context.Context, currentPrice float64, coin models.Coin, user models.User, coiniks models.Coiniks) error {
+func (s *Service) HandleRaisingEntryPrice(ctx context.Context, currentPrice float64, coin models.Coin, user models.User, coiniks models.Coiniks, candik bool) error {
 	coin.EntryPrice = currentPrice
 
 	err := s.sStorageRepo.ResetCoin(ctx, coin, user)
@@ -445,37 +470,40 @@ func (s *Service) HandleRaisingEntryPrice(ctx context.Context, currentPrice floa
 	}
 
 	// Creating new buy order.
-	createReq := models.CreateOrderRequest{
-		Category:    "spot",
-		Side:        "Buy",
-		Symbol:      coin.Name,
-		OrderType:   "Limit",
-		Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/currentPrice),
-		MarketUint:  "baseCoin",
-		PositionIdx: 0,
-		Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-resetedCoin.Decrement),
-		TimeInForce: "GTC",
+	if candik {
+		createReq := models.CreateOrderRequest{
+			Category:    "spot",
+			Side:        "Buy",
+			Symbol:      coin.Name,
+			OrderType:   "Limit",
+			Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", user.USDTBalance*0.015/currentPrice),
+			MarketUint:  "baseCoin",
+			PositionIdx: 0,
+			Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", coin.EntryPrice-resetedCoin.Decrement),
+			TimeInForce: "GTC",
+		}
+
+		createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error creating order", err)
+			return err
+		}
+		ctx = logging.WithOrderId(ctx, createOrderResp.Result.OrderID)
+
+		updateCoin := models.NewCoin(user.Id, coin.Name)
+		updateCoin.BuyOrderId = createOrderResp.Result.OrderID
+
+		err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error updating coin", err)
+			return err
+		}
 	}
 
-	createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error creating order", err)
-		return err
-	}
-	ctx = logging.WithOrderId(ctx, createOrderResp.Result.OrderID)
-
-	updateCoin := models.NewCoin(user.Id, coin.Name)
-	updateCoin.BuyOrderId = createOrderResp.Result.OrderID
-
-	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error updating coin", err)
-		return err
-	}
 	return nil
 }
 
-func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.GetOrderResponse, coin models.Coin, user models.User, coiniks models.Coiniks, actionChanMap map[int64]chan models.Message) error {
+func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.GetOrderResponse, coin models.Coin, user models.User, coiniks models.Coiniks, actionChanMap map[int64]chan models.Message, candik bool) error {
 	price, err := strconv.ParseFloat(getOrderResp.Result.List[0].Price, 64)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error parsing price to float", err)
@@ -514,33 +542,35 @@ func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.
 		return err
 	}
 
-	// Creating new buy order.
-	createReq := models.CreateOrderRequest{
-		Category:    "spot",
-		Side:        "Buy",
-		Symbol:      coin.Name,
-		OrderType:   "Limit",
-		Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", coin.Count/float64(len(coin.Buy))),
-		Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", price-coin.Decrement),
-		TimeInForce: "GTC",
-	}
+	if candik {
+		// Creating new buy order.
+		createReq := models.CreateOrderRequest{
+			Category:    "spot",
+			Side:        "Buy",
+			Symbol:      coin.Name,
+			OrderType:   "Limit",
+			Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", coin.Count/float64(len(coin.Buy))),
+			Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", price-coin.Decrement),
+			TimeInForce: "GTC",
+		}
 
-	createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error creating order", err)
-		return err
-	}
+		createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error creating order", err)
+			return err
+		}
 
-	updateCoin := models.NewCoin(user.Id, coin.Name)
-	if createOrderResp.Result.OrderID == "" {
-		return nil
-	}
-	updateCoin.BuyOrderId = createOrderResp.Result.OrderID
+		updateCoin := models.NewCoin(user.Id, coin.Name)
+		if createOrderResp.Result.OrderID == "" {
+			return nil
+		}
+		updateCoin.BuyOrderId = createOrderResp.Result.OrderID
 
-	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
-	if err != nil {
-		slog.ErrorContext(ctx, "Error updating coin", err)
-		return err
+		err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+		if err != nil {
+			slog.ErrorContext(ctx, "Error updating coin", err)
+			return err
+		}
 	}
 
 	// Canceling old sell order, if it exists.
@@ -565,7 +595,7 @@ func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.
 	}
 	avg := sum / float64(len(coin.Buy))
 
-	createReq = models.CreateOrderRequest{
+	createReq := models.CreateOrderRequest{
 		Category:    "spot",
 		Side:        "Sell",
 		Symbol:      coin.Name,
@@ -575,13 +605,13 @@ func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.
 		TimeInForce: "GTC",
 	}
 
-	createOrderResp, err = s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
+	createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
 	if err != nil {
 		slog.ErrorContext(ctx, "Error creating order", err)
 		return err
 	}
 
-	updateCoin = models.NewCoin(user.Id, coin.Name)
+	updateCoin := models.NewCoin(user.Id, coin.Name)
 	updateCoin.SellOrderId = createOrderResp.Result.OrderID
 
 	err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)

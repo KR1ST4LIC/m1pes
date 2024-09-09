@@ -307,7 +307,7 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		}
 	}
 
-	if userSum > userUSDTBalance {
+	if userSum > userUSDTBalance*0.95 {
 		candik = false
 	}
 	// Getting current price of coin from api.
@@ -335,6 +335,41 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		slog.ErrorContext(ctx, "Error getting coiniks", err)
 		_, eris.File, eris.Line, _ = runtime.Caller(0)
 		return err, eris
+	}
+
+	if coin.Count > 0 {
+		if coin.SellOrderId == "" {
+			var sum float64
+			for i := 0; i < len(coin.Buy); i++ {
+				sum += coin.Buy[i]
+			}
+			avg := sum / float64(len(coin.Buy))
+
+			createReq := models.CreateOrderRequest{
+				Category:    "spot",
+				Side:        "Sell",
+				Symbol:      coin.Name,
+				OrderType:   "Limit",
+				Qty:         fmt.Sprintf("%."+strconv.Itoa(coiniks.QtyDecimals)+"f", coin.Count),
+				Price:       fmt.Sprintf("%."+strconv.Itoa(coiniks.PriceDecimals)+"f", avg*(1+user.Percent)),
+				TimeInForce: "GTC",
+			}
+
+			createOrderResp, err := s.apiRepo.CreateOrder(ctx, createReq, user.ApiKey, user.SecretKey)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error creating order", err)
+				return err, eris
+			}
+
+			updateCoin := models.NewCoin(user.Id, coin.Name)
+			updateCoin.SellOrderId = createOrderResp.Result.OrderID
+
+			err = s.sStorageRepo.UpdateCoin(ctx, updateCoin)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error updating coin", err)
+				return err, eris
+			}
+		}
 	}
 
 	if !user.Buy {
@@ -383,6 +418,9 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		getReq["symbol"] = coin.Name
 
 		getOrderResp, err := s.apiRepo.GetOrder(ctx, getReq, user.ApiKey, user.SecretKey)
+		if getOrderResp.Result.List == nil {
+			fmt.Println("у меня сдохла мать бубубубуб\n\n\n\n\n\n\n\n\n я даун")
+		}
 		if err != nil {
 			slog.ErrorContext(ctx, "Error getting order", err)
 			_, eris.File, eris.Line, _ = runtime.Caller(0)
@@ -391,18 +429,16 @@ func (s *Service) HandleCoinUpdate(ctx context.Context, coin models.Coin, userId
 		ctx = logging.WithOrderId(ctx, getOrderResp.Result.List[0].OrderId)
 
 		// If that buy order has no errors and order status is filled.
-		if len(getOrderResp.Result.List) > 0 {
-			if getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
-				slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
+		if len(getOrderResp.Result.List) > 0 && getOrderResp.Result.List[0].OrderStatus == SuccessfulOrderStatus && getOrderResp.Result.List[0].Side == "Buy" {
+			slog.DebugContext(ctx, "fulfilled BUY ORDER was found", "resp", getOrderResp.Result.List[0])
 
-				err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap, candik)
-				if err != nil {
-					slog.ErrorContext(ctx, "Error handling filled buy order", err)
-					_, eris.File, eris.Line, _ = runtime.Caller(0)
-					return err, eris
-				}
-				return nil, eris
+			err = s.HandleFilledBuyOrder(ctx, getOrderResp, coin, user, coiniks, actionChanMap, candik)
+			if err != nil {
+				slog.ErrorContext(ctx, "Error handling filled buy order", err)
+				_, eris.File, eris.Line, _ = runtime.Caller(0)
+				return err, eris
 			}
+			return nil, eris
 		}
 	}
 

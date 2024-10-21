@@ -573,6 +573,7 @@ func (s *Service) HandleFilledBuyOrder(ctx context.Context, getOrderResp models.
 	}
 
 	coin.Count += count
+	coin.BuyOrderId = "setNull"
 
 	err = s.sStorageRepo.UpdateCoin(ctx, coin)
 	if err != nil {
